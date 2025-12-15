@@ -1,0 +1,37 @@
+-- Enable pgvector extension
+    CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Create embedding table for sobreclubes
+CREATE TABLE sobreclubes (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) NOT NULL,
+    "Description" TEXT NOT NULL,
+    "Embedding" vector(1024) NOT NULL
+);
+
+CREATE INDEX idx_sobre_clubes_embedding 
+ON sobreclubes 
+USING hnsw ("Embedding" vector_l2_ops); 
+
+CREATE TABLE clubes (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) NOT NULL,
+    "Description" TEXT NOT NULL
+);
+
+
+    INSERT INTO clubes ("Name", "Description") VALUES
+        ('Corinthians', 'O Corinthians é um dos clubes mais populares do Brasil, fundado em 1910 e dono de uma história repleta de títulos importantes. Entre suas maiores conquistas estão a Libertadores da América de 2012, o Mundial de Clubes da FIFA de 2000 e 2012, além de vários Campeonatos Brasileiros, Copas do Brasil e inúmeros títulos estaduais pelo Paulistão.
+Suas cores tradicionais são preto e branco, que simbolizam simplicidade e força. O mascote oficial é o Mosqueteiro, escolhido por representar coragem e espírito de luta — características marcantes da identidade corinthiana. A torcida do Corinthians, conhecida como Fiel Torcida, é famosa por sua paixão incondicional e apoio fervoroso ao time, tanto em jogos no Brasil quanto em competições internacionais.');
+
+ INSERT INTO clubes ("Name", "Description") VALUES
+        ('Palmeiras', 'O Palmeiras, fundado em 1914, é um dos clubes mais tradicionais e vitoriosos do futebol brasileiro. Com uma rica história de conquistas, o clube acumula títulos importantes como a Copa Libertadores da América, o Campeonato Brasileiro e a Copa do Brasil. O Palmeiras é conhecido por sua forte base de torcedores e por sua rivalidade histórica com outros grandes clubes paulistas, como o Corinthians e o São Paulo FC.
+As cores oficiais do Palmeiras são o verde e a branco, que representam a esperança e a paz. O mascote do clube é o Porco, símbolo de força e determinação, adotado pela torcida como um emblema de orgulho. A torcida do Palmeiras, conhecida como Palestra Itália, é reconhecida por sua paixão e lealdade ao clube, apoiando-o fervorosamente em todas as competições.');
+
+    INSERT INTO clubes ("Name", "Description") VALUES
+            ('São Paulo FC', 'O São Paulo Futebol Clube, fundado em 1930, é um dos clubes mais prestigiados do futebol brasileiro e mundial. Com uma história repleta de conquistas, o São Paulo acumula títulos importantes como a Copa Libertadores da América, o Mundial de Clubes da FIFA e vários Campeonatos Brasileiros. O clube é conhecido por sua estrutura profissional e por revelar grandes talentos para o futebol nacional e internacional.
+As cores oficiais do São Paulo FC são o vermelho, branco e preto, que simbolizam a paixão, a paz e a força. O mascote do clube é o Soberano, representando a grandeza e a tradição do time. A torcida do São Paulo FC, conhecida como Tricolor Paulista, é famosa por sua dedicação e apoio incondicional ao clube em todas as competições.');
+
+    INSERT INTO clubes ("Name", "Description") VALUES
+            ('Santos FC', 'O Santos Futebol Clube, fundado em 1912, é um dos clubes mais icônicos do futebol brasileiro, conhecido mundialmente por revelar talentos extraordinários como Pelé e Neymar. Com uma rica história de conquistas, o Santos acumula títulos importantes como a Copa Libertadores da América, o Mundial de Clubes da FIFA e vários Campeonatos Brasileiros. O clube é reconhecido por seu estilo de jogo ofensivo e pela formação de jogadores que se destacam no cenário internacional.
+As cores oficiais do Santos FC são o branco e o preto, que representam a pureza e a força. O mascote do clube é o Baleia, simbolizando a grandeza e a tradição do time. A torcida do Santos FC, conhecida como Santástica, é famosa por sua paixão e apoio fervoroso ao clube em todas as competições.');
