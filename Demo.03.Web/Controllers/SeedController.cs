@@ -85,7 +85,7 @@ public class SeedController(
 
     [HttpGet]
     [Route("ollama-sobre-clube")]
-    public async Task<IActionResult> Prompt(string prompt)
+    public async Task<IActionResult> ClubePrompt(string prompt)
     {
         var embeddingService = ollamaApiClient.AsTextEmbeddingGenerationService();
         var embedding = await embeddingService.GenerateEmbeddingAsync(prompt);
@@ -109,6 +109,33 @@ public class SeedController(
 
         return Ok(sobreClubes);
     }
+
+    //[HttpGet]
+    //[Route("ollama-product")]
+    //public async Task<IActionResult> ProductPrompt(string prompt)
+    //{
+    //    var embeddingService = ollamaApiClient.AsTextEmbeddingGenerationService();
+    //    var embedding = await embeddingService.GenerateEmbeddingAsync(prompt);
+    //    var vectorEmbedding = new Vector(embedding.ToArray());
+
+    //    var products = await context.ProductsRecomendation
+    //                             .AsNoTracking()
+    //                             .OrderBy(e => e.Embedding.CosineDistance(vectorEmbedding))
+    //                             .Select(x => new { x.Name, x.Description })
+    //                             .Take(1)//pega os 3 mais proximos. se quiser dar pra deixar 1 para pegar somente o mais proximo
+    //                             .ToListAsync();
+
+    //    if (!products.Any())
+    //    {
+    //        return Ok(new
+    //        {
+    //            message = "Nenhum product encontrado para essa busca",
+    //            results = new List<object>()
+    //        });
+    //    }
+
+    //    return Ok(products);
+    //}
 
     #region Gemini Example
 
@@ -258,7 +285,7 @@ public class SeedController(
     /// <param name="Prompt"></param>
     /// <returns></returns>
     [HttpGet]
-    [Route("gemini-recomendation")]
+    [Route("gemini-product-recomendation")]
     public async Task<IActionResult> GeminiPrompt(string prompt)
     {
 
@@ -276,8 +303,8 @@ public class SeedController(
         var productsRecomendations = await context.ProductsRecomendation
                                  .AsNoTracking()
                                  .OrderBy(e => e.Embedding.CosineDistance(vectorEmbedding))
-                                 .Select(x => new { x.Name, x.Description, x.Category, x.Price })
-                                 .Take(5)//pega os 3 mais proximos. se quiser dar pra deixar 1 para pegar somente o mais proximo
+                                 .Select(x => new { x.Id, x.Name, x.Description, x.Category, x.Price })
+                                 .Take(1)//pega os 3 mais proximos. se quiser dar pra deixar 1 para pegar somente o mais proximo
                                  .ToListAsync();
 
         if (!productsRecomendations.Any())

@@ -1,49 +1,60 @@
-﻿using Microsoft.SemanticKernel;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.SemanticKernel;
 using System.ComponentModel;
 
 namespace Demo.Embedding.Web;
 
 public class ProductPlugin
 {
-    private readonly List<Product> _products = new()
+    private readonly IServiceScopeFactory _scopeFactory;
+    public ProductPlugin(IServiceScopeFactory scopeFactory)
     {
-        new Product(1, "Laptop", 999.99m),
-        new Product(2, "Smartphone", 499.99m),
-        new Product(3, "Tablet", 299.99m)
-    };
+        _scopeFactory = scopeFactory;
+    }
 
     //prompt: get the complete products list
     [KernelFunction("get_products")]
     [Description("Retrieves all products from the catalog.")]
-    public async Task<List<Product>> GetAllProducts()
+    public async Task<List<Products>> GetAllProducts()
     {
-        return _products;
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppEmbeddingDbContext>();
+        return await context.Products.AsNoTracking().ToListAsync();
     }
 
     // prompt: get product with id 1 or get product with name Laptop
     [KernelFunction("get_product_by_id")]
     [Description("Retrieves a product by its ID.")]
-    public async Task<Product?> GetProductById(int id)
+    public async Task<Products?> GetProductById(int id)
     {
-        return _products.FirstOrDefault(p => p.Id == id);
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppEmbeddingDbContext>();
+        return context.Products.FirstOrDefault(p => p.Id == id);
     }
 
     // prompt: update the Laptop price to 200
     [KernelFunction("update_product")]
     [Description("Updates a product in the catalog.")]
-    public async Task<List<Product>> UpdateProduct(int id ,Product updatedProduct)
+    public async Task<List<Products>> UpdateProduct(int id , Products updatedProduct)
     {
-        var product = _products.FirstOrDefault(p => p.Id == id);
-        if (product == null) return new List<Product>();
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppEmbeddingDbContext>();
+
+        var product = context.Products.FirstOrDefault(p => p.Id == id);
+        if (product == null) return new List<Products>();
 
 
-        var productDto = product with { Name = updatedProduct.Name, Price = updatedProduct.Price };
+        product.Name = updatedProduct.Name;
+        product.Price = updatedProduct.Price;
+        product.Category = updatedProduct.Category;
+        product.Description = updatedProduct.Description;
 
-         _products.Remove(product);
-         _products.Add(productDto);
+        context.Products.Remove(product);
+        context.Products.Add(product);
 
-        return _products;
+        await context.SaveChangesAsync();
+
+        return context.Products.ToList();
     }
 
 }
-public record Product(int Id, string Name, decimal Price);

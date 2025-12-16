@@ -11,6 +11,9 @@ using OllamaSharp;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.None);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+
 var kernelBuilder = Kernel.CreateBuilder();
 
 builder.Services.AddControllers();
@@ -19,10 +22,19 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddDbContext<AppEmbeddingDbContext>(options => {
 
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),p => p.UseVector());
-});
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-builder.Services.AddScoped<AppEmbeddingDbContext>();
+    if (string.IsNullOrEmpty(connectionString))
+        throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+    {
+        npgsqlOptions.UseVector();
+    })
+    .EnableSensitiveDataLogging(false)  // Desabilitar dados sensíveis
+    .EnableDetailedErrors(false)        // Desabilitar erros detalhados
+    .LogTo(Console.WriteLine, LogLevel.None); // Desabilitar logs completamente
+});
 
 builder.Services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Trace));
 
@@ -36,7 +48,7 @@ var envTypeName = builder.Environment.EnvironmentName.ToLower();
 // Doc usar gemini client diretamente: https://ai.google.dev/gemini-api/docs/quickstart?hl=pt-br#c_1
 // Doc implemetacao alternativa com GeminiChatClient: https://github.com/rabuckley/GeminiDotnet
 
-var aiModel = Environment.GetEnvironmentVariable("AI_MODEL");
+
 var geminiApiKey = builder.Configuration["GOOGLE_API_KEY"]; // esse valor vem das variaveis de ambiente do sistema
 
 var geminiClient = new GeminiChatClient(new GeminiClientOptions
@@ -77,13 +89,13 @@ else
 }
 
 var kernel = kernelBuilder.Build();
-
-kernel.Plugins.AddFromType<ProductPlugin>("Products");
-
-// Registrar no DI
 builder.Services.AddSingleton(kernel);
 
 var app = builder.Build();
+
+var scopeFactory = app.Services.GetRequiredService<IServiceScopeFactory>();
+var plugin = new ProductPlugin(scopeFactory);
+kernel.Plugins.AddFromObject(plugin, "Products");
 
 app.UseSwagger();
 app.UseSwaggerUI();
