@@ -8,6 +8,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
+		<PackageReference Include="Google.GenAI" Version="0.9.0" />
+		<PackageReference Include="GeminiDotnet.Extensions.AI" Version="0.18.0" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
 		<PackageReference Include="Microsoft.Extensions.AI" Version="10.1.0" />
 		<PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.1.0" />
@@ -16,6 +19,7 @@
 		<PackageReference Include="Microsoft.SemanticKernel" Version="1.68.0" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 		<PackageReference Include="OllamaSharp" Version="5.4.12" />
+		<PackageReference Include="PdfPig" Version="0.1.12" />
 		<PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.2.2" />
 		<PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="10.0.1" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.0.1" />
@@ -23,6 +27,7 @@
 		<PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.68.0-alpha" />
 		<PackageReference Include="Microsoft.SemanticKernel.Connectors.PgVector" Version="1.68.0-preview" />
 		<PackageReference Include="System.Memory.Data" Version="10.0.1" />
+		<PackageReference Include="Z.EntityFramework.Extensions.EFCore" Version="10.105.2" />
 	</ItemGroup>
 
 </Project>

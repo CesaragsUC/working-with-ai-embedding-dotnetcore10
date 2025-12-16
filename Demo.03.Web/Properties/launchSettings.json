@@ -11,7 +11,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development",
         "AI_MODEL_PHI3": "phi3:3.8b",
         "AI_MODEL_GPT4": "gpt-4o-mini",
-        "OPENAI_API_KEY": "AIzaSyDFWJk-lT2kqHMJe6l-ez3SdfBPd9AuCkc"
+        "OPENAI_API_KEY": "YOUR-API-KEY"
       }
     },
     "test": {
@@ -23,8 +23,8 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Testing",
         "AI_MODEL_PHI3": "phi3:3.8b",
-        "AI_MODEL_GPT4": "gpt-4o-mini",
-        "OPENAI_API_KEY": "AIzaSyDFWJk-lT2kqHMJe6l-ez3SdfBPd9AuCkc"
+        "AI_MODEL_GPT4": "gemini-2.5-flash",
+        "OPENAI_API_KEY": "AIzaSyBznzDJtqHNwFqpYScM1vlcPVEEDENPnpc"
       }
     },
     "stage": {
@@ -36,8 +36,8 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Staging",
         "AI_MODEL_PHI3": "phi3:3.8b",
-        "AI_MODEL_GPT4": "gpt-4o-mini",
-        "OPENAI_API_KEY": "AIzaSyDFWJk-lT2kqHMJe6l-ez3SdfBPd9AuCkc"
+        "AI_MODEL_GPT4": "gemini-2.5-flash",
+        "OPENAI_API_KEY": "AIzaSyBznzDJtqHNwFqpYScM1vlcPVEEDENPnpc"
       }
     }
   }
