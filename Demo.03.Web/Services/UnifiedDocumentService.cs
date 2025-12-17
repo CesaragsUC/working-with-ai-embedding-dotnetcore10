@@ -46,6 +46,16 @@ public class UnifiedDocumentService
         };
     }
 
+    public string ExtractTextFromPdf(byte[] bytes)
+    {
+        using var ms = new MemoryStream(bytes);
+        using var pdf = PdfDocument.Open(ms);
+        var sb = new StringBuilder();
+        foreach (var page in pdf.GetPages())
+            sb.AppendLine(page.Text);
+        return sb.ToString();
+    }
+
     private async Task<string> ExtractFromPdfStream(Stream stream)
     {
         using var document = PdfDocument.Open(stream);
@@ -69,6 +79,7 @@ public class UnifiedDocumentService
         using var doc = PdfDocument.Open(filePath);
         return string.Join("\n\n", doc.GetPages().Select(p => p.Text));
     }
+
 
     private string ExtractFromDocx(string filePath)
     {

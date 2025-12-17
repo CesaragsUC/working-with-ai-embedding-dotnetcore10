@@ -1,17 +1,30 @@
 services:
   
-    postgres:
-      container_name: postgres-pg-vector
-      image: pgvector/pgvector:pg17
-      environment:
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: postgres
-        POSTGRES_DB: example_db
-      ports: ["5432:5432"]
-      volumes:
-        - postgres_data:/var/lib/postgresql/data
-        - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+  postgres:
+     container_name: postgres-pg-vector
+     image: pgvector/pgvector:pg17
+     environment:
+       POSTGRES_USER: postgres
+       POSTGRES_PASSWORD: postgres
+       POSTGRES_DB: example_db
+     ports: ["5432:5432"]
+     volumes:
+       - postgres_data:/var/lib/postgresql/data
+       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
 
+  seq:
+    image: datalust/seq:2025.2
+    container_name: seq-log
+    ports:
+      - "5341:80"
+    environment:
+      ACCEPT_EULA: Y
+      SEQ_FIRSTRUN_NOAUTHENTICATION: True
+    restart: unless-stopped
+    volumes:
+      - seq_data:/data
 volumes:
   postgres_data:
     driver: local
+  seq_data:
+    driver: local     

@@ -9,10 +9,21 @@ using Microsoft.OpenApi;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.Google;
 using OllamaSharp;
+using Serilog;
 using System;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Start Serilog configuration
+var logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console() // Write logs to console
+    .WriteTo.Seq(builder.Configuration["Serilog:SeqServerUrl"] ?? "http://localhost:5341") // Write to Seq server
+    .CreateLogger();
+
+Log.Logger = logger;
 
 var geminiHttpClient = GeminiHttpClientHelper.CreateGeminiHttpClient(ignoreSslErrors: builder.Environment.IsDevelopment());
 
@@ -25,6 +36,8 @@ var kernelBuilder = Kernel.CreateBuilder();
 builder.Services.AddControllers();
 
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton<IPdfPageRenderer, PdfPageRenderer>();
+
 
 // Para semanticKernel AddDbContextFactory é recomendado ao inves de AddDbContext. Fica melhor para usar os plugins
 builder.Services.AddDbContextFactory<AppEmbeddingDbContext>(options => {
