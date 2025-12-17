@@ -26,13 +26,10 @@ public class OllamaController(
 {
 
     [HttpPost]
-    [Route("ollama-seed")]
+    [Route("ollama-futebol-seed")]
     public async Task<IActionResult> Seed()
     {
         var embeddingService = ollamaApiClient.AsTextEmbeddingGenerationService();
-
-        //OPCAO 1: Usar o Docling para ler documentos e gerar embeddings a partir deles.
-        //Docling é uma open source para ler arquivos como PDF, Word, Excel, PowerPoint, TXT, entre outros, e extrair informações e gerar embeddings para esses documentos.
 
         var clubes = await context.Clubes.AsNoTracking().ToListAsync();
 
@@ -44,8 +41,11 @@ public class OllamaController(
 
             var sobreClube = new SobreClubes
             {
-                Id = item.Id,
+                Id = Guid.NewGuid(),
+                ClubeId = item.Id,
                 Name = item.Name,
+                Country = item.Country,
+                State = item.State,
                 Description = item.Description,
                 Embedding = new Vector(embedding)
             };
@@ -61,12 +61,14 @@ public class OllamaController(
 
 
     [HttpPost]
-    [Route("add-clube")]
+    [Route("add-futebol-clube")]
     public async Task<IActionResult> Add(ClubeAddDto clubeAdd)
     {
         var clube = new Clubes
         {
             Name = clubeAdd.Name,
+            Country = clubeAdd.Country,
+            State = clubeAdd.State,
             Description = clubeAdd.Description
         };
 
@@ -77,8 +79,10 @@ public class OllamaController(
 
         var sobreClube = new SobreClubes
         {
-            Id = 6, // Defina o Id conforme necessário
+            Id = Guid.NewGuid(),
             Name = clube.Name,
+            Country = clube.Country,
+            State = clube.State,
             Description = clube.Description,
             Embedding = new Vector(embedding)
         };
@@ -91,7 +95,7 @@ public class OllamaController(
     }
 
     [HttpGet]
-    [Route("ollama-sobre-clube")]
+    [Route("ollama-sobre-futebol-clube")]
     public async Task<IActionResult> ClubePrompt(string prompt)
     {
         var embeddingService = ollamaApiClient.AsTextEmbeddingGenerationService();
@@ -101,7 +105,7 @@ public class OllamaController(
         var sobreClubes = await context.SobreClubes
                                  .AsNoTracking()
                                  .OrderBy(e => e.Embedding.CosineDistance(vectorEmbedding))
-                                 .Select(x => new { x.Name, x.Description })
+                                 .Select(x => new { x.Id, x.Name, x.Country, x.State,  x.Description })
                                  .Take(1)//pega os 3 mais proximos. se quiser dar pra deixar 1 para pegar somente o mais proximo
                                  .ToListAsync();
 

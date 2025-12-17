@@ -9,8 +9,7 @@ services:
        POSTGRES_DB: example_db
      ports: ["5432:5432"]
      volumes:
-       - postgres_data:/var/lib/postgresql/data
-       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+       - pg_vector_data:/var/lib/postgresql/data
 
   seq:
     image: datalust/seq:2025.2
@@ -24,7 +23,7 @@ services:
     volumes:
       - seq_data:/data
 volumes:
-  postgres_data:
+  pg_vector_data:
     driver: local
   seq_data:
     driver: local     

@@ -1,5 +1,6 @@
 ﻿using PDFtoImage;
 using SkiaSharp;
+using System.Drawing;
 
 namespace Demo.Embedding.Web;
 
@@ -13,12 +14,21 @@ public interface IPdfPageRenderer
     /// <param name="maxPages"></param>
     /// <param name="ct"></param>
     /// <returns></returns>
-    Task<List<byte[]>> SkiaSharpPdfRenderPagesAsPngAsync(byte[] pdfBytes, int maxPages, CancellationToken ct);
+    Task<List<byte[]>> SkiaSharpPdfRenderPagesAsPngListAsync(byte[] pdfBytes, int maxPages, CancellationToken ct);
+
+    /// <summary>
+    /// Renderiza as page do PDF como imagens PNG usando SkiaSharp
+    /// </summary>
+    /// <param name="pdfBytes"></param>
+    /// <param name="maxPages"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    Task<byte[]> SkiaSharpPdfRenderPagesAsPngAsync(byte[] pdfBytes, int maxPages, CancellationToken ct);
 }
 
 public class PdfPageRenderer : IPdfPageRenderer
 {
-    public async Task<List<byte[]>> SkiaSharpPdfRenderPagesAsPngAsync(
+    public async Task<List<byte[]>> SkiaSharpPdfRenderPagesAsPngListAsync(
        byte[] pdfBytes,
        int maxPages,
        CancellationToken ct)
@@ -49,6 +59,28 @@ public class PdfPageRenderer : IPdfPageRenderer
             }
 
             return images;
+        }, ct);
+    }
+
+    public async Task<byte[]> SkiaSharpPdfRenderPagesAsPngAsync(
+      byte[] pdfBytes,
+      int maxPages,
+      CancellationToken ct)
+    {
+        return await Task.Run(() =>
+        {
+            byte[] image;
+
+            using var pdfStream = new MemoryStream(pdfBytes);
+
+            // Renderiza com alta qualidade
+            var bitmap = Conversion.ToImage(pdfStream);
+
+            ct.ThrowIfCancellationRequested();
+
+            var pngBytes = bitmap.Encode(SKEncodedImageFormat.Png,100).ToArray();
+
+            return pngBytes;
         }, ct);
     }
 }

@@ -4,8 +4,11 @@ namespace Demo.Embedding.Web;
 
 public class SobreClubes
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; }
+    public Guid? ClubeId { get; set; }
     public string Name { get; set; }
+    public string Country { get; set; }
+    public string State { get; set; }
     public string Description { get; set; }
     public Vector Embedding { get; set; }
 }

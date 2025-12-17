@@ -1,7 +1,5 @@
 
 using Demo.Embedding.Web;
-using GeminiDotnet;
-using GeminiDotnet.Extensions.AI;
 using Google.GenAI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -10,7 +8,6 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.Google;
 using OllamaSharp;
 using Serilog;
-using System;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,7 +37,8 @@ builder.Services.AddSingleton<IPdfPageRenderer, PdfPageRenderer>();
 
 
 // Para semanticKernel AddDbContextFactory é recomendado ao inves de AddDbContext. Fica melhor para usar os plugins
-builder.Services.AddDbContextFactory<AppEmbeddingDbContext>(options => {
+builder.Services.AddDbContextFactory<AppEmbeddingDbContext>(options =>
+{
 
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -64,22 +62,16 @@ builder.Services.AddSingleton<UnifiedDocumentService>();
 var envType = builder.Environment.IsDevelopment();
 var envTypeName = builder.Environment.EnvironmentName.ToLower();
 
-// Doc usar gemini client diretamente: https://ai.google.dev/gemini-api/docs/quickstart?hl=pt-br#c_1
-// Doc implemetacao alternativa com GeminiChatClient: https://github.com/rabuckley/GeminiDotnet
+#region  Setup Semantic Kernel with Gemini - Gemini Client SDK - Ollama
 
+// Doc Gemini Client SDK: https://googleapis.github.io/dotnet-genai/
 
 var geminiApiKey = builder.Configuration["GOOGLE_API_KEY"]; // esse valor vem das variaveis de ambiente do sistema
 
-var geminiClient = new GeminiChatClient(new GeminiClientOptions
-{
-    ApiKey = geminiApiKey!,
-    ModelId = "gemini-2.5-flash"
-});
 
 // The client gets the API key from the environment variable `GEMINI_API_KEY`.
 var client = new Client();
 builder.Services.AddSingleton(client);
-builder.Services.AddSingleton(geminiClient);
 
 
 // Just to show alternative way to create the ChatClient for OpenAI ChatGPT.
@@ -91,7 +83,7 @@ var chatGptClient = new OpenAI.Chat.ChatClient(
 
 var ollamaApiClient = new OllamaApiClient("http://localhost:11434", "mxbai-embed-large:latest");
 builder.Services.AddSingleton(ollamaApiClient);
-
+builder.Services.AddSingleton(chatGptClient);
 
 GoogleAIGeminiChatCompletionService chatCompletionService = new(
     modelId: "gemini-2.5-flash",
@@ -104,47 +96,30 @@ builder.Services.AddSingleton(chatCompletionService);
 // Create singletons of your plugins
 builder.Services.AddSingleton<ProductPlugin>();
 
-if (builder.Environment.IsDevelopment())
+var handler = new HttpClientHandler
 {
-    var handler = new HttpClientHandler
-    {
-        // Evita falha por revogação offline (bem comum em redes corporativas)
-        CheckCertificateRevocationList = false,
-    };
+    // Evita falha por revogação offline (bem comum em redes corporativas)
+    CheckCertificateRevocationList = false,
+};
 
-    //builder.Services.AddDistributedMemoryCache();
 
-    // Model Config
-    kernelBuilder.AddOllamaEmbeddingGenerator(
-        modelId: "mxbai-embed-large:latest",// supported models: mxbai-embed-large:latest
-        endpoint: new Uri("http://localhost:11434"),
-        serviceId: "OllamaEmbedding"
-    );
-
-    // Embedding Config
-    kernelBuilder.AddOllamaChatCompletion(
-        modelId: "llama3.2:1b",// supported models: llama3.2:1b
-        endpoint: new Uri("http://localhost:11434")
-    );
-
-}
-else
+// ambientes stage/prod usam Redis para cache de histórico de chat
+if (!builder.Environment.IsDevelopment())
 {
-
+    // Setup Google Gemini Embedding and Chat Completion
     kernelBuilder.AddGoogleAIEmbeddingGenerator(
         "text-embedding-004",
-        geminiApiKey, 
+        geminiApiKey,
         apiVersion: GoogleAIVersion.V1,
         serviceId: "GeminiEmbedding",
         geminiHttpClient);
 
     kernelBuilder.AddGoogleAIGeminiChatCompletion
-        ("gemini-2.5-flash", 
-        geminiApiKey, 
+        ("gemini-2.5-flash",
+        geminiApiKey,
         apiVersion: GoogleAIVersion.V1,
         serviceId: "GeminiChat",
         geminiHttpClient);
-
 
     builder.Services.AddStackExchangeRedisCache(options =>
     {
@@ -152,6 +127,22 @@ else
         options.InstanceName = "ChatHistory:";
     });
 }
+else
+{
+    // Setup Ollama Embedding and Chat Completion
+    kernelBuilder.AddOllamaEmbeddingGenerator(
+        modelId: "mxbai-embed-large:latest",// supported models: mxbai-embed-large:latest
+        endpoint: new Uri("http://localhost:11434"),
+        serviceId: "OllamaEmbedding"
+    );
+
+    kernelBuilder.AddOllamaChatCompletion(
+        modelId: "llama3.2:1b",// supported models: llama3.2:1b
+        endpoint: new Uri("http://localhost:11434")
+    );
+
+}
+
 
 builder.Services.AddSingleton<Kernel>(sp =>
 {
@@ -162,6 +153,9 @@ builder.Services.AddSingleton<Kernel>(sp =>
 
     return kernel;
 });
+
+
+#endregion
 
 var app = builder.Build();
 

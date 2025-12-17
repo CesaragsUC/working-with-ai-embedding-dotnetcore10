@@ -24,11 +24,11 @@ public class AppEmbeddingDbContext : DbContext
         modelBuilder.Entity<Clubes>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id)
-                  .HasColumnType("integer")
-                  .UseIdentityColumn();
+            entity.Property(e => e.Id).HasColumnName("Id").HasColumnType("uuid");
             entity.Property(e => e.Id).HasColumnName("Id");
             entity.Property(e => e.Name).HasColumnName("Name").IsRequired();
+            entity.Property(e => e.Country).HasColumnName("Country").IsRequired();
+            entity.Property(e => e.State).HasColumnName("State").IsRequired();
             entity.Property(e => e.Description).HasColumnName("Description").IsRequired();
             entity.ToTable("clubes");
         });
@@ -36,11 +36,11 @@ public class AppEmbeddingDbContext : DbContext
         modelBuilder.Entity<SobreClubes>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id)
-                  .HasColumnType("integer")
-                  .UseIdentityColumn();
+            entity.Property(e => e.Id).HasColumnName("Id").HasColumnType("uuid");
             entity.Property(e => e.Id).HasColumnName("Id");
             entity.Property(e => e.Name).HasColumnName("Name").IsRequired();
+            entity.Property(e => e.Country).HasColumnName("Country").IsRequired();
+            entity.Property(e => e.State).HasColumnName("State").IsRequired();
             entity.Property(e => e.Description).HasColumnName("Description").IsRequired();
             entity.Property(e => e.Embedding).HasColumnName("Embedding").IsRequired().HasColumnType("vector(1024)");
             entity.ToTable("sobreclubes");
@@ -50,9 +50,7 @@ public class AppEmbeddingDbContext : DbContext
         modelBuilder.Entity<Products>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id)
-                  .HasColumnType("integer")
-                  .UseIdentityColumn();
+            entity.Property(e => e.Id).HasColumnName("Id").HasColumnType("uuid");
             entity.Property(e => e.Id).HasColumnName("Id");
             entity.Property(e => e.Name).HasColumnName("Name").IsRequired();
             entity.Property(e => e.Category).HasColumnName("Category").IsRequired();
@@ -64,9 +62,7 @@ public class AppEmbeddingDbContext : DbContext
         modelBuilder.Entity<ProductsRecomendation>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id)
-                  .HasColumnType("integer")
-                  .UseIdentityColumn();
+            entity.Property(e => e.Id).HasColumnName("Id").HasColumnType("uuid");
             entity.Property(e => e.Id).HasColumnName("Id");
             entity.Property(e => e.Name).HasColumnName("Name").IsRequired();
             entity.Property(e => e.Category).HasColumnName("Category").IsRequired();
@@ -80,7 +76,7 @@ public class AppEmbeddingDbContext : DbContext
         modelBuilder.Entity<MyDemoDocument>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Id).HasColumnName("Id").HasColumnType("uuid");
             entity.Property(e => e.Title).HasColumnName("Title").IsRequired();
             entity.Property(e => e.DocText).HasColumnName("DocText").IsRequired();
             entity.ToTable("mydocuments");
@@ -89,9 +85,7 @@ public class AppEmbeddingDbContext : DbContext
         modelBuilder.Entity<MyDemoDocumentRecomendation>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id)
-                  .HasColumnType("integer")
-                  .UseIdentityColumn();
+            entity.Property(e => e.Id).HasColumnName("Id").HasColumnType("uuid");
             entity.Property(e => e.Id).HasColumnName("Id");
             entity.Property(e => e.Title).HasColumnName("Title").IsRequired();
             entity.Property(e => e.DocText).HasColumnName("DocText").IsRequired();

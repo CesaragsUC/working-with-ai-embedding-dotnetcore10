@@ -24,7 +24,7 @@ public class ProductPlugin
     // prompt: get product with id 1 or get product with name Laptop
     [KernelFunction("get_product_by_id")]
     [Description("Retrieves a product by its ID.")]
-    public async Task<Products?> GetProductById(int id)
+    public async Task<Products?> GetProductById(Guid id)
     {
         await using var _context = await _factory.CreateDbContextAsync();
         return _context.Products.FirstOrDefault(p => p.Id == id);
@@ -33,7 +33,7 @@ public class ProductPlugin
     // prompt: update the Laptop price to 200
     [KernelFunction("update_product_price")]
     [Description("Updates a product in the catalog.")]
-    public async Task<Products> UpdateProductPrice(int id , decimal price)
+    public async Task<Products> UpdateProductPrice(Guid id , decimal price)
     {
         await using var _context = await _factory.CreateDbContextAsync();
 
