@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
 
@@ -6,20 +7,18 @@ namespace Demo.Embedding.Web;
 
 public class ProductPlugin
 {
-    private readonly IServiceScopeFactory _scopeFactory;
-    public ProductPlugin(IServiceScopeFactory scopeFactory)
-    {
-        _scopeFactory = scopeFactory;
-    }
+    private readonly IDbContextFactory<AppEmbeddingDbContext> _factory;
+
+    public ProductPlugin(IDbContextFactory<AppEmbeddingDbContext> factory)
+        => _factory = factory;
 
     //prompt: get the complete products list
     [KernelFunction("get_products")]
     [Description("Retrieves all products from the catalog.")]
     public async Task<List<Products>> GetAllProducts()
     {
-        using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppEmbeddingDbContext>();
-        return await context.Products.AsNoTracking().ToListAsync();
+        await using var _context = await _factory.CreateDbContextAsync();
+        return await _context.Products.AsNoTracking().ToListAsync();
     }
 
     // prompt: get product with id 1 or get product with name Laptop
@@ -27,34 +26,30 @@ public class ProductPlugin
     [Description("Retrieves a product by its ID.")]
     public async Task<Products?> GetProductById(int id)
     {
-        using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppEmbeddingDbContext>();
-        return context.Products.FirstOrDefault(p => p.Id == id);
+        await using var _context = await _factory.CreateDbContextAsync();
+        return _context.Products.FirstOrDefault(p => p.Id == id);
     }
 
     // prompt: update the Laptop price to 200
-    [KernelFunction("update_product")]
+    [KernelFunction("update_product_price")]
     [Description("Updates a product in the catalog.")]
-    public async Task<List<Products>> UpdateProduct(int id , Products updatedProduct)
+    public async Task<Products> UpdateProductPrice(int id , decimal price)
     {
-        using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppEmbeddingDbContext>();
+        await using var _context = await _factory.CreateDbContextAsync();
 
-        var product = context.Products.FirstOrDefault(p => p.Id == id);
-        if (product == null) return new List<Products>();
+        var product = _context.Products.FirstOrDefault(p => p.Id == id);
 
+        if (product == null)  throw new Exception("Product not found");
 
-        product.Name = updatedProduct.Name;
-        product.Price = updatedProduct.Price;
-        product.Category = updatedProduct.Category;
-        product.Description = updatedProduct.Description;
+        Console.WriteLine($"[SK] Updating product {id} price -> {price}");
+        product.Price = price;
 
-        context.Products.Remove(product);
-        context.Products.Add(product);
+        _context.Products.Update(product);
 
-        await context.SaveChangesAsync();
+        var rows =  await _context.SaveChangesAsync();
 
-        return context.Products.ToList();
+        Console.WriteLine($"[SK] SaveChanges rows: {rows}");
+        return product;
     }
 
 }

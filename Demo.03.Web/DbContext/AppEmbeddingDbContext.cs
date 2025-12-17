@@ -14,6 +14,7 @@ public class AppEmbeddingDbContext : DbContext
     public DbSet<MyDemoDocumentRecomendation> MyDemoDocumentRecomendation { get; set; }
     public DbSet<MyDemoDocument> MyDemoDocuments { get; set; }
 
+    public DbSet<ProductSearchResult> ProductSearchResults { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -72,6 +73,7 @@ public class AppEmbeddingDbContext : DbContext
             entity.Property(e => e.Price).HasColumnName("Price").IsRequired();
             entity.Property(e => e.Description).HasColumnName("Description").IsRequired();
             entity.Property(e => e.Embedding).HasColumnName("Embedding").IsRequired().HasColumnType("vector(768)");
+            entity.Property(e => e.EmbeddingLLM).HasColumnName("EmbeddingLLM").IsRequired().HasColumnType("vector(1024)");
             entity.ToTable("product_recomendation");
         });
 
@@ -97,6 +99,9 @@ public class AppEmbeddingDbContext : DbContext
             entity.Property(e => e.Embedding).HasColumnName("Embedding").IsRequired().HasColumnType("vector(768)");
             entity.ToTable("documents_recomendation");
         });
+
+        modelBuilder.Entity<ProductSearchResult>().HasNoKey(); // usado para consultas sem chave primaria
+
 
         modelBuilder.HasPostgresExtension("vector");
     }

@@ -7,9 +7,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.OpenApi;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Connectors.Google;
 using OllamaSharp;
+using System;
+
 
 var builder = WebApplication.CreateBuilder(args);
+
+var geminiHttpClient = GeminiHttpClientHelper.CreateGeminiHttpClient(ignoreSslErrors: builder.Environment.IsDevelopment());
+
 
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.None);
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
@@ -20,7 +26,8 @@ builder.Services.AddControllers();
 
 builder.Services.AddOpenApi();
 
-builder.Services.AddDbContext<AppEmbeddingDbContext>(options => {
+// Para semanticKernel AddDbContextFactory é recomendado ao inves de AddDbContext. Fica melhor para usar os plugins
+builder.Services.AddDbContextFactory<AppEmbeddingDbContext>(options => {
 
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -44,7 +51,6 @@ builder.Services.AddSingleton<UnifiedDocumentService>();
 var envType = builder.Environment.IsDevelopment();
 var envTypeName = builder.Environment.EnvironmentName.ToLower();
 
-#region Gemini Setup
 // Doc usar gemini client diretamente: https://ai.google.dev/gemini-api/docs/quickstart?hl=pt-br#c_1
 // Doc implemetacao alternativa com GeminiChatClient: https://github.com/rabuckley/GeminiDotnet
 
@@ -72,15 +78,61 @@ var chatGptClient = new OpenAI.Chat.ChatClient(
 
 var ollamaApiClient = new OllamaApiClient("http://localhost:11434", "mxbai-embed-large:latest");
 builder.Services.AddSingleton(ollamaApiClient);
-#endregion
 
+
+GoogleAIGeminiChatCompletionService chatCompletionService = new(
+    modelId: "gemini-2.5-flash",
+    apiKey: geminiApiKey,
+    apiVersion: GoogleAIVersion.V1 // Optional
+);
+
+builder.Services.AddSingleton(chatCompletionService);
+
+// Create singletons of your plugins
+builder.Services.AddSingleton<ProductPlugin>();
 
 if (builder.Environment.IsDevelopment())
 {
+    var handler = new HttpClientHandler
+    {
+        // Evita falha por revogação offline (bem comum em redes corporativas)
+        CheckCertificateRevocationList = false,
+    };
+
     //builder.Services.AddDistributedMemoryCache();
+
+    // Model Config
+    kernelBuilder.AddOllamaEmbeddingGenerator(
+        modelId: "mxbai-embed-large:latest",// supported models: mxbai-embed-large:latest
+        endpoint: new Uri("http://localhost:11434"),
+        serviceId: "OllamaEmbedding"
+    );
+
+    // Embedding Config
+    kernelBuilder.AddOllamaChatCompletion(
+        modelId: "llama3.2:1b",// supported models: llama3.2:1b
+        endpoint: new Uri("http://localhost:11434")
+    );
+
 }
 else
 {
+
+    kernelBuilder.AddGoogleAIEmbeddingGenerator(
+        "text-embedding-004",
+        geminiApiKey, 
+        apiVersion: GoogleAIVersion.V1,
+        serviceId: "GeminiEmbedding",
+        geminiHttpClient);
+
+    kernelBuilder.AddGoogleAIGeminiChatCompletion
+        ("gemini-2.5-flash", 
+        geminiApiKey, 
+        apiVersion: GoogleAIVersion.V1,
+        serviceId: "GeminiChat",
+        geminiHttpClient);
+
+
     builder.Services.AddStackExchangeRedisCache(options =>
     {
         options.Configuration = builder.Configuration.GetConnectionString("Redis");
@@ -88,14 +140,17 @@ else
     });
 }
 
-var kernel = kernelBuilder.Build();
-builder.Services.AddSingleton(kernel);
+builder.Services.AddSingleton<Kernel>(sp =>
+{
+    var kernel = kernelBuilder.Build();
+
+    // plugin criado via DI (não use AddFromType aqui)
+    kernel.Plugins.AddFromObject(sp.GetRequiredService<ProductPlugin>(), "ProductPlugin");
+
+    return kernel;
+});
 
 var app = builder.Build();
-
-var scopeFactory = app.Services.GetRequiredService<IServiceScopeFactory>();
-var plugin = new ProductPlugin(scopeFactory);
-kernel.Plugins.AddFromObject(plugin, "Products");
 
 app.UseSwagger();
 app.UseSwaggerUI();

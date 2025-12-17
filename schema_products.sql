@@ -8,8 +8,11 @@ CREATE TABLE product_recomendation (
     "Category" VARCHAR(255) NOT NULL,
     "Price" DECIMAL(10,2) NOT NULL,
     "Description" TEXT NOT NULL,
-    "Embedding" vector(768) NOT NULL -- Gemini embeddings have 768 dimensions. change according your embedding model
+    "Embedding" vector(768)  NULL, -- Gemini embeddings have 768 dimensions. change according your embedding model
+    "EmbeddingLLM" vector(1024)  NULL -- Ollama (mxbai-embed-large:latest) embeddings have 1024 dimensions. change according your embedding model
 );
+
+
 
 CREATE INDEX idx_recomendation_embedding 
 ON product_recomendation 

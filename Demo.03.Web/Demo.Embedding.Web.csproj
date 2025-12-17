@@ -17,6 +17,8 @@
 		<PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.1.0-preview.1.25608.1" />
 		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.1" />
 		<PackageReference Include="Microsoft.SemanticKernel" Version="1.68.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" Version="1.68.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.Google" Version="1.68.0-alpha" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 		<PackageReference Include="OllamaSharp" Version="5.4.12" />
 		<PackageReference Include="PdfPig" Version="0.1.12" />

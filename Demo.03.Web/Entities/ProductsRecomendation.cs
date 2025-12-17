@@ -9,5 +9,6 @@ public class ProductsRecomendation
     public string Category { get; set; }
     public decimal Price { get; set; }
     public string Description { get; set; }
-    public Vector Embedding { get; set; }
+    public Vector? Embedding { get; set; }
+    public Vector? EmbeddingLLM { get; set; } // for local Ollama LLM require to be 1024
 }
