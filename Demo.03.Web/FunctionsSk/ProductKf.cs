@@ -6,7 +6,7 @@ using System.ComponentModel;
 
 namespace Demo.Embedding.Web;
 
-public interface IProductService
+public interface IProductKf
 {
     [KernelFunction("get_products")]
     [Description("Retrieves all products from the catalog.")]
@@ -33,11 +33,11 @@ public interface IProductService
     Task<List<ProductDto>> GetProductByBudget(decimal budget);
 }
 
-public sealed class ProductService: IProductService
+public sealed class ProductKf: IProductKf
 {
     private readonly IDbContextFactory<AppEmbeddingDbContext> _factory;
 
-    public ProductService(IDbContextFactory<AppEmbeddingDbContext> factory)
+    public ProductKf(IDbContextFactory<AppEmbeddingDbContext> factory)
         => _factory = factory;
 
     //prompt: get the complete products list

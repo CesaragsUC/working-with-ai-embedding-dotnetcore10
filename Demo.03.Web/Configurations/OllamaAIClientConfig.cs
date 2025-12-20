@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
+using Serilog;
 
 namespace Demo.Embedding.Web;
 
@@ -11,6 +12,7 @@ public static class OllamaAIClientConfig
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
+        Log.Information("Starting Ollama AI Client Configuration...");
         var kernelBuilder = Kernel.CreateBuilder();
 
         var serverEndpoint = configuration.GetSection("OllamaAI:ServerUrl").Value;
@@ -37,11 +39,16 @@ public static class OllamaAIClientConfig
             var kernel = kernelBuilder.Build();
 
             // plugin criado via DI (não use AddFromType aqui)
-            var productService = sp.GetRequiredService<IProductService>();
-            kernel.Plugins.AddFromObject(productService);
+            var productService = sp.GetRequiredService<IProductKf>();
+            kernel.ImportPluginFromObject(productService, "Product");
+
+            var textprocessorService = sp.GetRequiredService<ITextProcessorKf>();
+            kernel.ImportPluginFromObject(textprocessorService, "TextProcessor");
 
             return kernel;
         });
+
+        Log.Information("Ollama AI Client Configuration completed.");
 
         return services;
     }

@@ -1,23 +1,24 @@
-using Demo.Embedding.Web;
+ï»¿using Demo.Embedding.Web;
 using Demo.Embedding.Web.Configurations;
-using Demo.Embedding.Web.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
-using Microsoft.SemanticKernel;
 using Serilog;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders(); // evita Console/Debug duplicados
+
 // Start Serilog configuration to save in Seq logs
 var logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
-    .WriteTo.Console() // Write logs to console
-    .WriteTo.Seq(builder.Configuration["Serilog:SeqServerUrl"] ?? "http://localhost:5341") // Write to Seq server
     .CreateLogger();
 
 Log.Logger = logger;
+builder.Host.UseSerilog();
+Log.Information("Starting application...");
+Log.Information("Environment: {Environment}", builder.Environment.EnvironmentName);
 
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.None);
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
@@ -26,6 +27,11 @@ builder.Services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Trace))
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IPdfPageRenderer, PdfPageRenderer>();
+builder.Services.AddSingleton<UnifiedDocumentService>();
+
+builder.Services.AddInfraStructureServices(builder.Configuration);
+builder.Services.AddScoped<IProductKf, ProductKf>();
+builder.Services.AddScoped<ITextProcessorKf, TextProcessorKf>();
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -41,20 +47,22 @@ builder.Services.AddSwaggerGen(c =>
     c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
 });
 
-builder.Services.AddSingleton<UnifiedDocumentService>();
+//Aumentar limite de request body
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartBodyLengthLimit = int.MaxValue;
+});
 
 var envType = builder.Environment.IsDevelopment();
 var envTypeName = builder.Environment.EnvironmentName.ToLower();
 
 var handler = new HttpClientHandler
 {
-    // Evita falha por revogação offline (bem comum em redes corporativas)
+    // Evita falha por revogaÃ§Ã£o offline (bem comum em redes corporativas)
     CheckCertificateRevocationList = false,
 };
 
-builder.Services.AddInfraStructureServices(builder.Configuration);
-builder.Services.AddSingleton<IAutoFunctionInvocationFilter, FunctionFilter>();
-builder.Services.AddScoped<IProductService, ProductService>();
 
 if (builder.Environment.IsDevelopment())
 {
@@ -65,7 +73,7 @@ else
 {
     builder.Services.AddGeminiAIClientConfig(builder.Configuration, builder.Environment);
 
-    // ambientes stage/prod usam Redis para cache de histórico de chat caso precise.
+    // ambientes stage/prod usam Redis para cache de histÃ³rico de chat caso precise.
     builder.Services.AddStackExchangeRedisCache(options =>
     {
         options.Configuration = builder.Configuration.GetConnectionString("Redis");

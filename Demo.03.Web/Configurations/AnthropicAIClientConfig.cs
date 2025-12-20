@@ -3,6 +3,7 @@ using Anthropic;
 using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.Google;
+using Serilog;
 
 namespace Demo.Embedding.Web;
 
@@ -13,6 +14,8 @@ public static class AnthropicAIClientConfig
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
+        Log.Information("Starting Anthropic AI Client Configuration...");
+
         var kernelBuilder = Kernel.CreateBuilder();
 
         // ANTHROPIC_API_KEY vem das variaveis de ambiente do sistema Recomendado para evitar vazar em codigo fonte.
@@ -53,11 +56,16 @@ public static class AnthropicAIClientConfig
             var kernel = kernelBuilder.Build();
 
             // plugin criado via DI (não use AddFromType aqui)
-            var productService = sp.GetRequiredService<IProductService>();
-            kernel.Plugins.AddFromObject(productService);
+            var productService = sp.GetRequiredService<IProductKf>();
+            kernel.ImportPluginFromObject(productService, "Product");
+
+            var textprocessorService = sp.GetRequiredService<ITextProcessorKf>();
+            kernel.ImportPluginFromObject(textprocessorService, "TextProcessor");
 
             return kernel;
         });
+
+        Log.Information("Anthropic AI Client Configuration completed.");
 
         return services;
     }

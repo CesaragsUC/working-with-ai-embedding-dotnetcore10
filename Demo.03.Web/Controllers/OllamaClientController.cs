@@ -16,7 +16,7 @@ using Pgvector.EntityFrameworkCore;
 namespace Demo.Embedding.Web;
 
 [Route("api/[controller]")]
-public class OllamaController(
+public class OllamaClientController(
     Kernel _kernel,
     OllamaApiClient ollamaApiClient,
     AppEmbeddingDbContext context,

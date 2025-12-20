@@ -5,6 +5,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.Google;
+using Serilog;
 
 namespace Demo.Embedding.Web;
 
@@ -20,7 +21,7 @@ public static class GeminiAIClientConfig
     {
         var kernelBuilder = Kernel.CreateBuilder();
 
-        // var geminiHttpClient = GeminiHttpClientHelper.CreateGeminiHttpClient(ignoreSslErrors: environment.IsDevelopment());
+        Log.Information("Starting Gemini AI Client Configuration...");
 
         // GOOGLE_API_KEY vem das variaveis de ambiente do sistema Recomendado para evitar vazar em codigo fonte.
         // Em producao salvar em Azure Key Vault ou similar.
@@ -28,12 +29,12 @@ public static class GeminiAIClientConfig
             ?? throw new InvalidOperationException("GOOGLE_API_KEY not configured");
 
         var chatModel = configuration.GetSection("GeminiAI:ChatModel").Value
-                        ?? "gemini-2.5-flash";
+            ?? throw new InvalidOperationException("GeminiAI:ChatModel not configured");
 
         var embeddingModel = configuration.GetSection("GeminiAI:EmbeddingGeneratorModel").Value
-                             ?? "text-embedding-004";
+            ?? throw new InvalidOperationException("GeminiAI:EmbeddingGeneratorModel not configured");
 
-        //Alternativa IChatClient direto, sem Semantic Kernel. Microsoft.Extensions.AI (baixo nível)
+        //Regista Alternativa IChatClient direto, sem Semantic Kernel. Microsoft.Extensions.AI (baixo nível)
         services.AddScoped<Client>(sp =>
         {
             var client = new Client();
@@ -64,11 +65,16 @@ public static class GeminiAIClientConfig
             var kernel = kernelBuilder.Build();
 
             // plugin criado via DI (não use AddFromType aqui)
-            var productService = sp.GetRequiredService<IProductService>();
-            kernel.Plugins.AddFromObject(productService);
+            var productService = sp.GetRequiredService<IProductKf>();
+            kernel.ImportPluginFromObject(productService, "Product");
+
+            var textprocessorService = sp.GetRequiredService<ITextProcessorKf>();
+            kernel.ImportPluginFromObject(textprocessorService, "TextProcessor");
 
             return kernel;
         });
+
+        Log.Information("Gemini AI Client Configuration completed.");
 
         return services;
     }

@@ -1,19 +1,22 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Demo.Embedding.Web.Plugins.FunctionTemplates;
+using DocumentFormat.OpenXml.Wordprocessing;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.Google;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
 using OllamaSharp;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
+using Serilog;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace Demo.Embedding.Web;
 
 /// <summary>
 ///  Essa demo mostro como usar Gemini com Semantic Kernel
+///  KernelFunctions Documentation: https://learn.microsoft.com/en-us/semantic-kernel/concepts/ai-services/chat-completion/function-calling/function-choice-behaviors?pivots=programming-language-csharp
 /// </summary>
 
 
@@ -73,7 +76,7 @@ public class GeminiSKController : Controller
 
 
     [HttpGet()]
-    [Route("chat-products")]
+    [Route("chat-embedded-products")]
     public async Task<IActionResult> SearchProductsWithSk(string prompt)
     {
         var embedder = _kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>("GeminiEmbedding");
@@ -101,31 +104,62 @@ public class GeminiSKController : Controller
 
     }
 
-    [HttpPost()]
-    [Route("chat-functions")]
-    public async Task<IActionResult> FunctionWithSk(string prompt)
+    [HttpPost]
+    [Route("chat-textprocessor-auto")]
+    public async Task<IActionResult> AutoInvocation([FromQuery]string prompt)
     {
-
-
-        var chat = _kernel.GetRequiredService<IChatCompletionService>();
-
-        // Para o Gemini, você pode usar o GoogleAIPromptExecutionSettings (ou PromptExecutionSettings)
-        var settings = new PromptExecutionSettings
+        if (string.IsNullOrEmpty(prompt))
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+            return BadRequest(new { error = "Prompt is null or empty" });
+        }
+
+        //Configura para usar uma função específica
+        KernelFunction functionSk = _kernel.Plugins.GetFunction("TextProcessor", "ToUpper");
+
+        PromptExecutionSettings prompSettings = new()
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Required(functions: [functionSk])
         };
 
-        ChatHistory history = new();
-        history.AddUserMessage(prompt);
+        //Alternativa para AI decidir qual função usar com base no prompt
+        //PromptExecutionSettings prompSettings = new()
+        //{
+        //    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+        //};
 
-        await _kernel.InvokePromptAsync(prompt, new(settings));
+        var result = await _kernel.InvokePromptAsync(prompt, new KernelArguments(prompSettings));
 
-        var response = await chat.GetChatMessageContentAsync(
-            history,
-            executionSettings: settings,
-            kernel: _kernel);
+        return Ok(new { response = result.ToString() });
+    }
 
-        return Ok(response.Content);
+
+    [HttpPost()]
+    [Route("chat-product-functions")]
+    public async Task<IActionResult> FunctionWithSk(string prompt)
+    {
+        if (string.IsNullOrEmpty(prompt))
+        {
+            return BadRequest(new { error = "Prompt is null or empty" });
+        }
+
+        //Configura para usar uma função específica
+        KernelFunction functionSk = _kernel.Plugins.GetFunction("Product", "get_product_by_id");
+
+        PromptExecutionSettings prompSettings = new()
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Required(functions: [functionSk])
+        };
+
+        //Alternativa para AI decidir qual função usar com base no prompt
+        //PromptExecutionSettings prompSettings = new()
+        //{
+        //    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+        //};
+
+        var result = await _kernel.InvokePromptAsync(prompt, new KernelArguments(prompSettings));
+
+        return Ok(new { response = result.ToString() });
+
     }
 
 
