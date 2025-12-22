@@ -1,15 +1,12 @@
-﻿using Demo.Embedding.Web.Plugins.FunctionTemplates;
-using DocumentFormat.OpenXml.Wordprocessing;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.Google;
 using OllamaSharp;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
-using Serilog;
-using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace Demo.Embedding.Web;
@@ -116,16 +113,10 @@ public class GeminiSKController : Controller
         //Configura para usar uma função específica
         KernelFunction functionSk = _kernel.Plugins.GetFunction("TextProcessor", "ToUpper");
 
-        PromptExecutionSettings prompSettings = new()
+        GeminiPromptExecutionSettings prompSettings = new()
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Required(functions: [functionSk])
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
         };
-
-        //Alternativa para AI decidir qual função usar com base no prompt
-        //PromptExecutionSettings prompSettings = new()
-        //{
-        //    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-        //};
 
         var result = await _kernel.InvokePromptAsync(prompt, new KernelArguments(prompSettings));
 
@@ -137,6 +128,8 @@ public class GeminiSKController : Controller
     [Route("chat-product-functions")]
     public async Task<IActionResult> FunctionWithSk(string prompt)
     {
+        var chat = _kernel.GetRequiredService<IChatCompletionService>();
+
         if (string.IsNullOrEmpty(prompt))
         {
             return BadRequest(new { error = "Prompt is null or empty" });
@@ -145,19 +138,34 @@ public class GeminiSKController : Controller
         //Configura para usar uma função específica
         KernelFunction functionSk = _kernel.Plugins.GetFunction("Product", "get_product_by_id");
 
-        PromptExecutionSettings prompSettings = new()
+        GeminiPromptExecutionSettings prompSettings = new()
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Required(functions: [functionSk])
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Required(functions: [functionSk]),
         };
 
-        //Alternativa para AI decidir qual função usar com base no prompt
-        //PromptExecutionSettings prompSettings = new()
-        //{
-        //    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-        //};
+        var history = new ChatHistory();
+
+        // System Prompt para "educar" o Gemini a não gerar Python
+        history.AddSystemMessage(
+            "You are an assistant connected to a product database. " +
+            "When asked for data, invoke the provided tools directly. " +
+            "Do NOT respond with Python code or pseudo-code blocks. " +
+            "If you don't have the ID, ask the user for it first."
+        );
+
+        history.AddUserMessage(prompt);
+
+        var resultChat = await chat.GetChatMessageContentAsync(
+           prompt,
+           executionSettings: prompSettings,
+           kernel: _kernel
+        );
+
 
         var result = await _kernel.InvokePromptAsync(prompt, new KernelArguments(prompSettings));
 
+
+       // return Ok(new { response = resultChat.Content });
         return Ok(new { response = result.ToString() });
 
     }

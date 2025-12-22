@@ -1,5 +1,7 @@
 ﻿
-using Anthropic;
+
+using Anthropic.SDK;
+using Anthropic.SDK.Examples;
 using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.Google;
@@ -38,18 +40,19 @@ public static class AnthropicAIClientConfig
             serviceId: "GeminiEmbedding",
             geminiHttpClient);
 
-        ///Chat Completion
-        var anthropicClient = new AnthropicClient(new()
-        {
-            APIKey = apiKey
-        })
-                         .AsIChatClient(chatModel)
-                         .AsBuilder()
-                         .UseFunctionInvocation()
-                         .Build();
+        var retryInterceptor = new RetryInterceptor(
+            maxRetries: 3,
+            initialDelay: TimeSpan.FromSeconds(1),
+            backoffMultiplier: 2.0
+        );
 
-        services.AddChatClient(anthropicClient);
+        IChatClient anthropicChatClient = new AnthropicClient(apiKeys: new APIAuthentication(apiKey)).Messages
+            .AsBuilder()
+            .UseFunctionInvocation()
+            .UseKernelFunctionInvocation()
+            .Build();
 
+        services.AddChatClient(anthropicChatClient);
 
         services.AddSingleton<Kernel>(sp =>
         {

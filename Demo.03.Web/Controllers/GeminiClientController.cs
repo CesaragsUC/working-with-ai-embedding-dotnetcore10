@@ -1,4 +1,6 @@
-﻿using Google.GenAI;
+﻿using Azure;
+using Demo.Embedding.Web.Utils;
+using Google.GenAI;
 using Google.GenAI.Types;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +16,7 @@ namespace Demo.Embedding.Web;
 
 /// <summary>
 ///  Essa demo mostro como usar Gemini Client SDK (implementacao direta baixo nivel)
+///  Pacote: https://github.com/googleapis/dotnet-genai
 /// </summary>
 
 
@@ -36,6 +39,119 @@ public class GeminiClientController : Controller
         _geminiClient = geminiClient;
         _documentService = documentService;
         _pdfRenderer = pdfPageRenderer;
+    }
+
+    [HttpPost]
+    [Route("generate-image")]
+    public async Task<IActionResult> GenerateImage(string prompt)
+    {
+        var generateImagesConfig = new GenerateImagesConfig
+        {
+            NumberOfImages = 1,
+            AspectRatio = "1:1",
+            SafetyFilterLevel = SafetyFilterLevel.BLOCK_LOW_AND_ABOVE,
+            PersonGeneration = PersonGeneration.DONT_ALLOW,
+            IncludeSafetyAttributes = true,
+            IncludeRaiReason = true,
+            OutputMimeType = "image/jpeg",
+        };
+        var response = await _geminiClient.Models.GenerateImagesAsync(
+          model: "imagen-3.0-generate-002",
+          prompt: "Red skateboard",
+          config: generateImagesConfig
+        );
+
+        // Do something with the generated image
+        var image = response.GeneratedImages.First().Image;
+
+        var fileName = $"image{Guid.NewGuid()}.jpg";
+
+        var savedPath = FileDownloadHelper.SaveToDownloads(fileName, image.ImageBytes);
+
+        return Ok($"Arquivo salvo em: {savedPath}");
+    }
+
+    [HttpPost]
+    [Route("generate-video")]
+    public async Task<IActionResult> GenerateVideo(string prompt)
+    {
+        var source = new GenerateVideosSource
+        {
+            Prompt = prompt,
+        };
+
+        var config = new GenerateVideosConfig
+        {
+            NumberOfVideos = 1,
+        };
+        var operation = await _geminiClient.Models.GenerateVideosAsync(
+          model: "veo-3.1-generate-preview", source: source, config: config);
+
+        while (operation.Done != true)
+        {
+            try
+            {
+                await Task.Delay(10000);
+                operation = await _geminiClient.Operations.GetAsync(operation, null);
+            }
+            catch (TaskCanceledException)
+            {
+                Log.Error("Task was cancelled while waiting.");
+                break;
+            }
+        }
+        // Do something with the generated video
+        var video = operation.Response.GeneratedVideos.First().Video;
+
+        await _geminiClient.Files.DownloadToFileAsync(
+            generatedVideo: operation.Response.GeneratedVideos.First(),
+            outputPath: $"video-{Guid.NewGuid()}.mp4"
+        );
+
+        return Ok($"Arquivo salvo");
+    }
+
+    [HttpPost]
+    [Route("generate-video-from-image")]
+    public async Task<IActionResult> GenerateVideoFromImage([FromForm] DescribeImageRequest request)
+    {
+        var source = new GenerateVideosSource
+        {
+            Prompt = request.Prompt,
+            Image = Image.FromFile(request.File.ContentType),
+        };
+
+        var config = new GenerateVideosConfig
+        {
+            NumberOfVideos = 1,
+        };
+
+        var operation = await _geminiClient.Models.GenerateVideosAsync(
+          model: "veo-3.1-generate-preview", source: source, config: config);
+
+        while (operation.Done != true)
+        {
+            try
+            {
+                await Task.Delay(10000);
+                operation = await _geminiClient.Operations.GetAsync(operation, null);
+            }
+            catch (TaskCanceledException)
+            {
+                Log.Error("Task was cancelled while waiting.");
+                break;
+            }
+        }
+
+        // Do something with the generated video
+        var video = operation.Response.GeneratedVideos.First().Video;
+
+        await _geminiClient.Files.DownloadToFileAsync(
+            generatedVideo: operation.Response.GeneratedVideos.First(),
+            outputPath: $"video-{Guid.NewGuid()}.mp4"
+        );
+
+        return Ok($"Arquivo salvo");
     }
 
 

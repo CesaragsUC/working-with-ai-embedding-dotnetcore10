@@ -2,7 +2,9 @@
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
+using Serilog;
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace Demo.Embedding.Web;
 
@@ -13,8 +15,8 @@ public interface IProductKf
     Task<List<ProductDto>> GetAllProducts();
 
     [KernelFunction("get_product_by_id")]
-    [Description("Retrieves a product by its ID.")]
-    Task<ProductDto?> GetProductById(Guid id);
+    [Description("Gets a product by its ID.")]
+    Task<ProductDto?> GetProductById(string id);
 
     [KernelFunction("update_product_price")]
     [Description("Updates a product in the catalog.")]
@@ -31,6 +33,11 @@ public interface IProductKf
     [KernelFunction("get_product_by_budget")]
     [Description("Retrieves a product by its budget.")]
     Task<List<ProductDto>> GetProductByBudget(decimal budget);
+
+    [KernelFunction("get_json_product_by_id")]
+    [Description("Get product by ID")]
+    Task<string> GetProductByIdJson(
+    [Description("Product ID")] string id);
 }
 
 public sealed class ProductKf: IProductKf
@@ -58,18 +65,63 @@ public sealed class ProductKf: IProductKf
 
     // prompt: get product with id 1 or get product with name Laptop
     [KernelFunction("get_product_by_id")]
-    [Description("Retrieves a product by its ID.")]
-    [return: Description("Return a product based on its ID.")]
-    public async Task<ProductDto?> GetProductById([Description("product Id.")] Guid id)
+    [Description("Gets a product by its ID.")]
+    public async Task<ProductDto?> GetProductById([Description("The product ID (UUID string).")] string id)
     {
+        if (!Guid.TryParse(id, out var guid))
+        {
+            Log.Error($"[SK] Falha ao converter GUID: {id}");
+            return null;
+        }
+
         await using var _context = await _factory.CreateDbContextAsync();
-        return await _context.Products.AsNoTracking().Where(p => p.Id == id).Select(p => new ProductDto
+        return await _context.Products.AsNoTracking().Where(p => p.Id == guid).Select(p => new ProductDto
         {
             Id = p.Id,
             Name = p.Name,
             Description = p.Description,
             Price = p.Price
         }).FirstOrDefaultAsync();
+    }
+
+    [KernelFunction("get_json_product_by_id")]
+    [Description("Gets a product by its ID.")]
+    public async Task<string> GetProductByIdJson([Description("The product ID (UUID string).")] string id)
+    {
+        try
+        {
+            if (!Guid.TryParse(id, out var guid))
+            {
+                return JsonSerializer.Serialize(new { error = "Invalid GUID format" });
+            }
+
+            await using var context = await _factory.CreateDbContextAsync();
+
+            var product = await context.Products
+                .AsNoTracking()
+                .Where(p => p.Id == guid)
+                .Select(p => new
+                {
+                    id = p.Id,
+                    name = p.Name,
+                    price = p.Price,
+                    category = p.Category,
+                    description = p.Description
+                })
+                .FirstOrDefaultAsync();
+
+            if (product == null)
+            {
+                return JsonSerializer.Serialize(new { error = "Product not found" });
+            }
+
+            //Retornar JSON string (mais fácil pra AI processar)
+            return JsonSerializer.Serialize(product);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message });
+        }
     }
 
     // prompt: update the Laptop price to 200

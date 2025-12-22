@@ -1,11 +1,8 @@
-﻿using Anthropic;
-using Google.GenAI;
-using Google.GenAI.Types;
+﻿using Anthropic.SDK;
+using Anthropic.SDK.Constants;
+using Anthropic.SDK.Messaging;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Pgvector;
-using Pgvector.EntityFrameworkCore;
-using Serilog;
+using Microsoft.Extensions.AI;
 using System.Diagnostics;
 
 namespace Demo.Embedding.Web.Controllers;
@@ -13,118 +10,85 @@ namespace Demo.Embedding.Web.Controllers;
 public class AnthropicClientController : Controller
 {
     private readonly Stopwatch _timer = new();
-    private readonly AppEmbeddingDbContext _context;
-    private readonly AnthropicClient _anthropicClient;
-    private readonly Client _geminiClient;
+    private readonly IChatClient _chatClient;
     private readonly UnifiedDocumentService _documentService;
     private readonly IPdfPageRenderer _pdfRenderer;
+    // private readonly Kernel _kernel;
 
     public AnthropicClientController(
         AppEmbeddingDbContext context,
-        AnthropicClient anthropicClient,
-        Client geminiClient,
+        IChatClient chatClient,
         UnifiedDocumentService documentService,
         IPdfPageRenderer pdfPageRenderer)
     {
-        _context = context;
-        _anthropicClient = anthropicClient;
+        _chatClient = chatClient;
         _documentService = documentService;
         _pdfRenderer = pdfPageRenderer;
-        _geminiClient = geminiClient;
-    }
-
-
-    [HttpPost]
-    [Route("upload-pdf")]
-    public async Task<IActionResult> GeminiDocSeed([FromForm] DocumentAddDto document)
-    {
-        if (document.Document == null || document.Document.Length == 0)
-            return BadRequest("Nenhum arquivo enviado");
-
-
-        var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
-        Directory.CreateDirectory(uploadsPath);
-
-
-        var filePath = Path.Combine(uploadsPath, document.Document.FileName);
-
-        var docToEmbed = await _documentService.ExtractTextFromStream(
-                                         document.Document.OpenReadStream(),
-                                         document.Document.FileName);
-
-
-        var response = await _geminiClient.Models.EmbedContentAsync(
-                               model: "text-embedding-004",
-                               contents: docToEmbed
-                             );
-
-        var embedding = response.Embeddings[0].Values.ToArray();
-
-        var embeddingResult = new ReadOnlyMemory<float>(embedding.Select(x => (float)x).ToArray());
-
-
-        var doc = new MyDemoDocument
-        {
-            Title = document.Title,
-            DocText = docToEmbed,
-        };
-
-        await _context.MyDemoDocuments.AddAsync(doc);
-        await _context.SaveChangesAsync();
-
-        var docRecomendation = new MyDemoDocumentRecomendation
-        {
-            Title = document.Title,
-            DocText = docToEmbed,
-            DocumentId = doc.Id,
-            Embedding = new Vector(embeddingResult)
-        };
-
-        await _context.MyDemoDocumentRecomendation.AddAsync(docRecomendation);
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Seed completed successfully" });
+        //  _kernel = kernel;   
     }
 
     [HttpGet]
-    [Route("chat-document")]
-    public async Task<IActionResult> GeminiDocPrompt(string prompt)
+    [Route("chatclient")]
+    public async Task<IActionResult> ProductPrompt(string prompt)
     {
-        var response = await _geminiClient.Models.EmbedContentAsync(
-                               model: "text-embedding-004",
-                               contents: prompt
-                             );
 
-        var embedding = response.Embeddings[0].Values.ToArray();
-
-        var embeddingResult = new ReadOnlyMemory<float>(embedding.Select(x => (float)x).ToArray());
-
-        var vectorEmbedding = new Vector(embeddingResult);
-
-        var docRecomendations = await _context.MyDemoDocumentRecomendation
-                                 .AsNoTracking()
-                                 .OrderBy(e => e.Embedding.CosineDistance(vectorEmbedding))
-                                 .Select(x => new { x.Title, x.DocText, x.DocumentId })
-                                 .Take(1)//pega os 3 mais proximos. se quiser dar pra deixar 1 para pegar somente o mais proximo
-                                 .ToListAsync();
-
-        if (!docRecomendations.Any())
+        ChatOptions options = new()
         {
-            return Ok(new
-            {
-                message = "Nenhum produto encontrado para essa busca",
-                results = new List<object>()
-            });
-        }
+            ModelId = AnthropicModels.Claude3Haiku,
+            MaxOutputTokens = 512,
+        };
 
-        return Ok(docRecomendations);
+        var response = await _chatClient.GetResponseAsync(prompt, options);
+
+        return Ok(response.Text);
     }
 
+
+    [HttpPost()]
+    [Route("chat-image")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> DescribeImage(
+        [FromForm] DescribeImageRequest request,
+        CancellationToken ct)
+    {
+        if (request.File is null || request.File.Length == 0)
+            return BadRequest("Nenhuma imagem enviada.");
+
+        if (!request.File.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Envie um arquivo de imagem (image/*).");
+
+        byte[] imageBytes;
+        var base64Image = string.Empty;
+        var mediaType = request.File.ContentType;
+
+        await using (var ms = new MemoryStream())
+        {
+            await request.File.CopyToAsync(ms, ct);
+            imageBytes = ms.ToArray();
+            base64Image = Convert.ToBase64String(imageBytes);
+        }
+
+        var response = await _chatClient.GetResponseAsync(
+        [
+            new ChatMessage(ChatRole.User,
+            [
+                new DataContent(imageBytes, "image/jpeg"),
+                new Microsoft.Extensions.AI.TextContent(request.Prompt),
+            ])
+        ], new()
+        {
+            ModelId = AnthropicModels.Claude45Haiku,
+            MaxOutputTokens = 512,
+            Temperature = 0f,
+        });
+
+        return Ok(response.Text);
+    }
 
     [HttpPost]
     [Route("chat-pdf")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> GeminiDescribePdfPrompt(
+    public async Task<IActionResult> DescribePdfPrompt(
            [FromForm] DescribeImageRequest request,
            CancellationToken ct)
     {
@@ -135,38 +99,56 @@ public class AnthropicClientController : Controller
             return BadRequest($"Arquivo não suportado: {request.File.FileName} ({request.File.ContentType})");
 
         byte[] fileBytes;
+        var base64File = string.Empty;
         await using (var ms = new MemoryStream())
         {
             await request.File.CopyToAsync(ms, ct);
             fileBytes = ms.ToArray();
+            base64File = Convert.ToBase64String(fileBytes);
         }
 
-        var pdfText = _documentService.ExtractTextFromPdf(fileBytes);
-
-        // quebra o texto se for muito grande, ajuda a evitar erros de limite de tokens
-        pdfText = pdfText.Length > 12000 ? pdfText[..12000] : pdfText;
-
-        var parts = new List<Part>
+        var _anthropicClient = new AnthropicClient();
+        var messages = new List<Message>()
         {
-            new Part { Text = request.Prompt },
-            new Part { Text = pdfText }
+            new Message(RoleType.User, new DocumentContent()
+            {
+                Source = new DocumentSource()
+                {
+                    Type = SourceType.base64,
+                    Data = base64File,
+                    MediaType = "application/pdf"
+                },
+                CacheControl = new CacheControl()
+                {
+                    Type = CacheControlType.ephemeral
+                }
+            }),
+            new Message(RoleType.User, request.Prompt),
         };
 
-        var response = await _geminiClient.Models.GenerateContentAsync(
-            model: "gemini-2.5-flash",
-            contents: new List<Content>
-            {
-               new Content { Role = "user", Parts = parts }
-            });
+        var parameters = new MessageParameters()
+        {
+            Messages = messages,
+            MaxTokens = 1024,
+            Model = AnthropicModels.Claude45Haiku,
+            Stream = false,
+            Temperature = 0m,
+            PromptCaching = PromptCacheType.FineGrained
+        };
+        var response = await _anthropicClient.Messages.GetClaudeMessageAsync(parameters);
 
-        return Ok(response.Candidates[0].Content.Parts[0].Text);
+        // retorna a resposta direta
+        var chatReponse = response.FirstMessage.Text;
+
+        //retorna o objeto completo de resposta
+        return Ok(response.Message.Content.FirstOrDefault());
     }
 
 
     [HttpPost]
     [Route("chat-pdf-scanned")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> GeminiDescribePdfScannedPrompt(
+    public async Task<IActionResult> DescribePdfScannedPrompt(
        [FromForm] DescribeImageRequest request,
         CancellationToken ct)
     {
@@ -182,148 +164,32 @@ public class AnthropicClientController : Controller
         }
 
         // Converte páginas para PNG (ex: 1 a 3 páginas pra teste)
-        var pagePngs = await _pdfRenderer.SkiaSharpPdfRenderPagesAsPngListAsync(pdfBytes, maxPages: 3, ct);
+        var imageBytes = await _pdfRenderer.SkiaSharpPdfRenderPagesAsPngListAsync(pdfBytes, maxPages: 3, ct);
 
-        if (pagePngs.Count == 0)
+        if (imageBytes.Count == 0)
             return BadRequest("Não consegui renderizar páginas desse PDF.");
 
-        var parts = new List<Part>
+        var chatMessages = new List<ChatMessage>();
+        ChatOptions option = new()
         {
-            new Part { Text = request.Prompt ?? "Describe what you see in these PDF pages:" }
+            ModelId = AnthropicModels.Claude45Haiku,
+            MaxOutputTokens = 512,
+            Temperature = 0f,
         };
 
-        foreach (var pngBytes in pagePngs)
+        foreach (var imageByte in imageBytes)
         {
-            parts.Add(new Part
-            {
-                InlineData = new Blob
-                {
-                    MimeType = "image/png",
-                    Data = pngBytes
-                }
-            });
+            var message = new ChatMessage(ChatRole.User,
+            [
+                new DataContent(imageByte, "image/png"),
+                new Microsoft.Extensions.AI.TextContent(request.Prompt),
+            ]);
+
+            chatMessages.Add(message);
         }
 
-        var resp = await _geminiClient.Models.GenerateContentAsync(
-            model: "gemini-2.5-flash",
-            contents: new List<Content> { new Content { Role = "user", Parts = parts } }
-        );
+        var response = await _chatClient.GetResponseAsync(chatMessages, option);
 
-        return Ok(resp.Candidates[0].Content.Parts[0].Text);
-    }
-
-    [HttpGet]
-    [Route("chat-product")]
-    public async Task<IActionResult> GeminiPrompt(string prompt)
-    {
-
-        var response = await _geminiClient.Models.EmbedContentAsync(
-                               model: "text-embedding-004",
-                               contents: prompt
-                             );
-
-        var embedding = response.Embeddings[0].Values.ToArray();
-
-        var embeddingResult = new ReadOnlyMemory<float>(embedding.Select(x => (float)x).ToArray());
-
-        var vectorEmbedding = new Vector(embeddingResult);
-
-        var productsRecomendations = await _context.ProductsRecomendation
-                                 .AsNoTracking()
-                                 .OrderBy(e => e.Embedding.CosineDistance(vectorEmbedding))
-                                 .Select(x => new { x.Id, x.Name, x.Description, x.Category, x.Price })
-                                 .Take(3)//pega os 3 mais proximos. se quiser dar pra deixar 1 para pegar somente o mais proximo
-                                 .ToListAsync();
-
-        if (!productsRecomendations.Any())
-        {
-            return Ok(new
-            {
-                message = "Nenhum produto encontrado para essa busca",
-                results = new List<object>()
-            });
-        }
-
-        return Ok(productsRecomendations);
-    }
-
-    [HttpGet]
-    [Route("product-recomendation")]
-    public async Task<IActionResult> ProductRecomentadion(string prompt)
-    {
-        var parts = new List<Part>
-        {
-            new Part { Text = prompt }
-        };
-
-        var response = await _geminiClient.Models.GenerateContentAsync(
-            model: "gemini-2.5-flash",
-            contents: new List<Content>
-            {
-                   new Content
-                   {
-                      Role = "user",
-                      Parts = parts
-                   }
-            });
-
-        return Ok(response.Candidates[0].Content.Parts[0].Text);
-    }
-
-    [HttpPost]
-    [Route("chat-image")]
-    [Consumes("multipart/form-data")]
-    public async Task<IActionResult> GeminiDescribeImagePrompt(
-       [FromForm] DescribeImageRequest request,
-        CancellationToken ct)
-    {
-        var imagesBase64 = string.Empty;
-        byte[] imagesBytes;
-        var parts = new List<Part>();
-
-        // texto do usuário
-        parts.Add(new Part { Text = request.Prompt });
-
-        if (request.File != null)
-        {
-            using var ms = new MemoryStream();
-            await request.File.CopyToAsync(ms, ct);
-            imagesBytes = ms.ToArray();
-
-            parts.Add(new Part
-            {
-                InlineData = new Blob
-                {
-                    MimeType = request.File.ContentType, // ex: image/png, image/jpeg
-                    Data = imagesBytes
-                }
-            });
-
-            if (request.File.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            {
-                imagesBase64 = Convert.ToBase64String(imagesBytes, Base64FormattingOptions.None);
-            }
-            else
-            {
-                return BadRequest($"[Arquivo não suportado no momento: {request.File.FileName} ({request.File.ContentType})]");
-            }
-
-            var response = await _geminiClient.Models.GenerateContentAsync(
-                model: "gemini-2.5-flash",
-                contents: new List<Content>
-                {
-                   new Content
-                   {
-                      Role = "user",
-                      Parts = parts
-                   }
-                });
-
-
-            Log.Warning(@"Process with file took {Elapsed:hh\:mm\:ss\.fff}", _timer.Elapsed);
-
-            return Ok(response.Candidates[0].Content.Parts[0].Text);
-        }
-        return BadRequest("Nenhum arquivo enviado");
+        return Ok(response.Text);
     }
 }
