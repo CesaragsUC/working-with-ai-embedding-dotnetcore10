@@ -30,8 +30,8 @@ builder.Services.AddSingleton<IPdfPageRenderer, PdfPageRenderer>();
 builder.Services.AddSingleton<UnifiedDocumentService>();
 
 builder.Services.AddInfraStructureServices(builder.Configuration);
-builder.Services.AddScoped<IProductKf, ProductKf>();
-builder.Services.AddScoped<ITextProcessorKf, TextProcessorKf>();
+builder.Services.AddSingleton<IProductKf, ProductKf>();
+builder.Services.AddSingleton<ITextProcessorKf, TextProcessorKf>();
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -71,8 +71,12 @@ if (builder.Environment.IsDevelopment())
 }
 else
 {
-    builder.Services.AddGeminiAIClientConfig(builder.Configuration, builder.Environment);
-   // builder.Services.AddAnthropicAIClientConfig(builder.Configuration, builder.Environment);
+     // builder.Services.AddGeminiAIClientConfig(builder.Configuration, builder.Environment);
+    //builder.Services.AddAnthropicAIClientConfig(builder.Configuration, builder.Environment);
+    builder.Services.AddOpenAIClientConfig(builder.Configuration, builder.Environment);
+    //builder.Services.AddOllamaAIClientConfig(builder.Configuration, builder.Environment);
+    //builder.Services.AddAzureAIClientConfig(builder.Configuration, builder.Environment);
+
 
     // ambientes stage/prod usam Redis para cache de histórico de chat caso precise.
     builder.Services.AddStackExchangeRedisCache(options =>

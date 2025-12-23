@@ -7,4 +7,9 @@ public class ChatRequest
     [Required]
     [StringLength(10000, MinimumLength = 1)]
     public string Prompt { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Envie uma Imagem.
+    /// </summary>
+    public IFormFile File { get; set; } = default!;
 }

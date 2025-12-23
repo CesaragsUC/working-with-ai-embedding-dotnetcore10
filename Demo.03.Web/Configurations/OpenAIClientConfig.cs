@@ -1,9 +1,22 @@
-﻿using Microsoft.Extensions.AI;
+﻿using Demo.Embedding.Web.Configurations.ConfigsModel;
+using Google.GenAI;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
+using OpenAI;
+using OpenAI.Audio;
+using OpenAI.Chat;
+using OpenAI.Embeddings;
+using OpenAI.Images;
 using Serilog;
+using System.ClientModel;
 
 namespace Demo.Embedding.Web;
 
+/// <summary>
+/// OpenAI SDK Doc: https://github.com/openai/openai-dotnet
+/// </summary>
 public static class OpenAIClientConfig
 {
     public static IServiceCollection AddOpenAIClientConfig(
@@ -12,38 +25,64 @@ public static class OpenAIClientConfig
              IWebHostEnvironment environment)
     {
         Log.Information("Starting OpenAI Client Configuration...");
-        var kernelBuilder = Kernel.CreateBuilder();
+
+        services
+        .AddOptions<OpenAIOptions>()
+        .Bind(configuration.GetSection(OpenAIOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
 
         // OPENAI_API_KEY vem das variaveis de ambiente do sistema Recomendado para evitar vazar em codigo fonte.
         // Em producao salvar em Azure Key Vault ou similar.
         var apiKey = configuration["OPENAI_API_KEY"];
-        var chatModel = configuration.GetSection("GeminiAI:ChatModel").Value;
-        var embeddingModel = configuration.GetSection("OpenAI:EmbeddingGeneratorModel").Value;
 
-        // Setup OpenAI Embedding and Chat Completion
-        #pragma warning disable SKEXP0010
-        kernelBuilder.AddOpenAIEmbeddingGenerator(
-            embeddingModel!,
-            apiKey!);
+        services.AddSingleton<ChatClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<OpenAIOptions>>().Value;
+            return new ChatClient(options.ChatModel, apiKey);
+        });
 
-        kernelBuilder.AddOpenAIChatCompletion
-        (
-           chatModel!,
-           apiKey!,
-           serviceId: "OpenAIChat"
-        );
+        services.AddSingleton<EmbeddingClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<OpenAIOptions>>().Value;
+            return new EmbeddingClient(options.EmbeddingGeneratorModel, apiKey);
+        });
+
+        services.AddSingleton<OpenAIClient>(sp =>
+        {
+            return new OpenAIClient(apiKey);
+        });
+
+
+        services.AddSingleton<ImageClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<OpenAIOptions>>().Value;
+            return new ImageClient(options.ImageModel, apiKey);
+        });
+
+        services.AddSingleton<AudioClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<OpenAIOptions>>().Value;
+            return new AudioClient(options.AudioModel, apiKey);
+        });
 
 
         services.AddSingleton<Kernel>(sp =>
         {
+            var options = sp.GetRequiredService<IOptions<OpenAIOptions>>().Value;
+
+            var kernelBuilder = Kernel.CreateBuilder();
+
+            // cria httpClient custom aqui (ou use IHttpClientFactory)
+            var handler = new HttpClientHandler { CheckCertificateRevocationList = false };
+            var httpClient = new HttpClient(handler);
+
+            kernelBuilder.AddOpenAIChatCompletion(options.ChatModel!, apiKey!, serviceId: "OpenAIChat", httpClient: httpClient);
+
             var kernel = kernelBuilder.Build();
 
-            // plugin criado via DI (não use AddFromType aqui)
-            var productService = sp.GetRequiredService<IProductKf>();
-            kernel.ImportPluginFromObject(productService, "Product");
-
-            var textprocessorService = sp.GetRequiredService<ITextProcessorKf>();
-            kernel.ImportPluginFromObject(textprocessorService, "TextProcessor");
+            kernel.ImportPluginFromObject(sp.GetRequiredService<IProductKf>(), "Product");
+            kernel.ImportPluginFromObject(sp.GetRequiredService<ITextProcessorKf>(), "TextProcessor");
 
             return kernel;
         });

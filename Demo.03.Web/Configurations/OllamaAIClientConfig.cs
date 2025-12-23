@@ -1,5 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Demo.Embedding.Web.Configurations.ConfigsModel;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Serilog;
 
@@ -13,37 +15,36 @@ public static class OllamaAIClientConfig
         IWebHostEnvironment environment)
     {
         Log.Information("Starting Ollama AI Client Configuration...");
-        var kernelBuilder = Kernel.CreateBuilder();
 
-        var serverEndpoint = configuration.GetSection("OllamaAI:ServerUrl").Value;
-        var embeddingModel = configuration.GetSection("OllamaAI:EmbeddingGeneratorModel").Value;
-        var chatModel = configuration.GetSection("OllamaAI:ChatModel").Value;
-
-
-        // Setup Ollama Embedding and Chat Completion
-        kernelBuilder.AddOllamaEmbeddingGenerator(
-            modelId: chatModel!,
-            endpoint: new Uri(serverEndpoint!),
-            serviceId: "OllamaEmbedding"
-        );
-
-        kernelBuilder.AddOllamaChatCompletion(
-            modelId: chatModel!,
-            endpoint: new Uri(serverEndpoint!),
-            serviceId: "OllamaChat"
-        );
-
+        services
+        .AddOptions<OllamaAIOptions>()
+        .Bind(configuration.GetSection(OllamaAIOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
 
         services.AddSingleton<Kernel>(sp =>
         {
+            var options = sp.GetRequiredService<IOptions<OllamaAIOptions>>().Value;
+
+            var kernelBuilder = Kernel.CreateBuilder();
+
+            // Setup Ollama Embedding and Chat Completion
+            kernelBuilder.AddOllamaEmbeddingGenerator(
+                modelId: options.EmbeddingGeneratorModel!,
+                endpoint: new Uri(options.ServerUrl!),
+                serviceId: "OllamaEmbedding"
+            );
+
+            kernelBuilder.AddOllamaChatCompletion(
+                modelId: options.ChatModel!,
+                endpoint: new Uri(options.ServerUrl!),
+                serviceId: "OllamaChat"
+            );
+
             var kernel = kernelBuilder.Build();
 
-            // plugin criado via DI (não use AddFromType aqui)
-            var productService = sp.GetRequiredService<IProductKf>();
-            kernel.ImportPluginFromObject(productService, "Product");
-
-            var textprocessorService = sp.GetRequiredService<ITextProcessorKf>();
-            kernel.ImportPluginFromObject(textprocessorService, "TextProcessor");
+            kernel.ImportPluginFromObject(sp.GetRequiredService<IProductKf>(), "Product");
+            kernel.ImportPluginFromObject(sp.GetRequiredService<ITextProcessorKf>(), "TextProcessor");
 
             return kernel;
         });

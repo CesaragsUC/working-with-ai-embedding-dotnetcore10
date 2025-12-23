@@ -1,5 +1,7 @@
-﻿using Google.GenAI;
+﻿using Demo.Embedding.Web.Configurations.ConfigsModel;
+using Google.GenAI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.Google;
 using Serilog;
@@ -16,8 +18,6 @@ public static class GeminiAIClientConfig
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
-        var kernelBuilder = Kernel.CreateBuilder();
-
         Log.Information("Starting Gemini AI Client Configuration...");
 
         // GOOGLE_API_KEY vem das variaveis de ambiente do sistema Recomendado para evitar vazar em codigo fonte.
@@ -25,11 +25,11 @@ public static class GeminiAIClientConfig
         var apiKey = configuration["GOOGLE_API_KEY"]
             ?? throw new InvalidOperationException("GOOGLE_API_KEY not configured");
 
-        var chatModel = configuration.GetSection("GeminiAI:ChatModel").Value
-            ?? throw new InvalidOperationException("GeminiAI:ChatModel not configured");
-
-        var embeddingModel = configuration.GetSection("GeminiAI:EmbeddingGeneratorModel").Value
-            ?? throw new InvalidOperationException("GeminiAI:EmbeddingGeneratorModel not configured");
+        services
+        .AddOptions<GeminiAIOptions>()
+        .Bind(configuration.GetSection(GeminiAIOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
 
         //Regista Alternativa IChatClient direto, sem Semantic Kernel. Microsoft.Extensions.AI (baixo nível)
         services.AddScoped<Client>(sp =>
@@ -38,35 +38,36 @@ public static class GeminiAIClientConfig
             return client;
         });
 
-        var geminiHttpClient = GeminiHttpClientHelper.CreateGeminiHttpClient(
-          ignoreSslErrors: environment.IsDevelopment());
-
-        // Setup Google Gemini Embedding and Chat Completion
-        kernelBuilder.AddGoogleAIEmbeddingGenerator(
-            embeddingModel!,
-            apiKey!,
-            apiVersion: GoogleAIVersion.V1,
-            serviceId: "GeminiEmbedding",
-            geminiHttpClient);
-
-        kernelBuilder.AddGoogleAIGeminiChatCompletion
-            (
-            chatModel!,
-            apiKey!,
-            apiVersion: GoogleAIVersion.V1,
-            serviceId: "GeminiChat",
-            geminiHttpClient);
-
         services.AddSingleton<Kernel>(sp =>
         {
+            var options = sp.GetRequiredService<IOptions<GeminiAIOptions>>().Value;
+
+            var kernelBuilder = Kernel.CreateBuilder();
+
+            // cria httpClient custom aqui (ou use IHttpClientFactory)
+            var geminiHttpClient = GeminiHttpClientHelper.CreateGeminiHttpClient(
+               ignoreSslErrors: environment.IsDevelopment());
+
+            // Setup Google Gemini Embedding and Chat Completion
+            kernelBuilder.AddGoogleAIEmbeddingGenerator(
+                options.EmbeddingGeneratorModel!,
+                apiKey!,
+                apiVersion: GoogleAIVersion.V1,
+                serviceId: "GeminiEmbedding",
+                geminiHttpClient);
+
+            kernelBuilder.AddGoogleAIGeminiChatCompletion
+                (
+                options.ChatModel!,
+                apiKey!,
+                apiVersion: GoogleAIVersion.V1,
+                serviceId: "GeminiChat",
+                geminiHttpClient);
+
             var kernel = kernelBuilder.Build();
 
-            // plugin criado via DI (não use AddFromType aqui)
-            var productService = sp.GetRequiredService<IProductKf>();
-            kernel.ImportPluginFromObject(productService, "Product");
-
-            var textprocessorService = sp.GetRequiredService<ITextProcessorKf>();
-            kernel.ImportPluginFromObject(textprocessorService, "TextProcessor");
+            kernel.ImportPluginFromObject(sp.GetRequiredService<IProductKf>(), "Product");
+            kernel.ImportPluginFromObject(sp.GetRequiredService<ITextProcessorKf>(), "TextProcessor");
 
             return kernel;
         });

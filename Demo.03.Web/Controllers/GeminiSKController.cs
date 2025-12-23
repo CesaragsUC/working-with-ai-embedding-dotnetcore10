@@ -102,7 +102,7 @@ public class GeminiSKController : Controller
     }
 
     [HttpPost]
-    [Route("chat-textprocessor-auto")]
+    [Route("chat-textprocessor")]
     public async Task<IActionResult> AutoInvocation([FromQuery]string prompt)
     {
         if (string.IsNullOrEmpty(prompt))
@@ -125,7 +125,7 @@ public class GeminiSKController : Controller
 
 
     [HttpPost()]
-    [Route("chat-product-functions")]
+    [Route("product-functions")]
     public async Task<IActionResult> FunctionWithSk(string prompt)
     {
         var chat = _kernel.GetRequiredService<IChatCompletionService>();
@@ -140,19 +140,12 @@ public class GeminiSKController : Controller
 
         GeminiPromptExecutionSettings prompSettings = new()
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Required(functions: [functionSk]),
+           // FunctionChoiceBehavior = FunctionChoiceBehavior.Required(functions: [functionSk]),
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
+
         };
 
         var history = new ChatHistory();
-
-        // System Prompt para "educar" o Gemini a não gerar Python
-        history.AddSystemMessage(
-            "You are an assistant connected to a product database. " +
-            "When asked for data, invoke the provided tools directly. " +
-            "Do NOT respond with Python code or pseudo-code blocks. " +
-            "If you don't have the ID, ask the user for it first."
-        );
-
         history.AddUserMessage(prompt);
 
         var resultChat = await chat.GetChatMessageContentAsync(

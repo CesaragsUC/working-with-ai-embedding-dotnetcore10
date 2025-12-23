@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Demo.Embedding.Web.Configurations.ConfigsModel;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Serilog;
 
@@ -14,48 +15,45 @@ public static class AzureAIClientConfig
     {
         Log.Information("Starting Azure AI Client Configuration...");
 
-        var kernelBuilder = Kernel.CreateBuilder();
-
         // AZURE_AI_API_KEY vem das variaveis de ambiente do sistema Recomendado para evitar vazar em codigo fonte.
         // Em producao salvar em Azure Key Vault ou similar.
         var apiKey = configuration["AZURE_AI_API_KEY"];
 
-        // nomes dos deployments que VOCÊ criou no Azure
-        var deployment = configuration["AzureAI:ChatDeployment"];
-        var embeddingDeployment = configuration["AzureAI:EmbeddingDeployment"];
-        var endpoint = configuration["AzureAI:Endpoint"];
-        var embeddingModel = configuration.GetSection("AzureAI:EmbeddingGeneratorModel").Value;
-        var chatModel = configuration.GetSection("AzureAI:ChatModel").Value;
-
-        // Setup AzureAI Embedding and Chat Completion
-        #pragma warning disable SKEXP0010
-        kernelBuilder.AddAzureOpenAIEmbeddingGenerator(
-            deploymentName: deployment!,
-            endpoint: endpoint!,
-            apiKey: apiKey!,
-            serviceId: "AzureEmbedding",
-            modelId: embeddingModel
-        );
-
-        kernelBuilder.AddAzureOpenAIChatCompletion(
-            deploymentName: deployment!,
-            endpoint: endpoint!,
-            apiKey: apiKey!,
-            serviceId: "AzureChat",
-            modelId: chatModel
-        );
-
+        services
+        .AddOptions<AzureAIOptions>()
+        .Bind(configuration.GetSection(AzureAIOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
 
         services.AddSingleton<Kernel>(sp =>
         {
+            var options = sp.GetRequiredService<IOptions<AzureAIOptions>>().Value;
+
+            var kernelBuilder = Kernel.CreateBuilder();
+
+            // Setup AzureAI Embedding and Chat Completion
+            #pragma warning disable SKEXP0010
+            kernelBuilder.AddAzureOpenAIEmbeddingGenerator(
+                deploymentName: options.ChatDeployment!,
+                endpoint: options.Endpoint!,
+                apiKey: apiKey!,
+                serviceId: "AzureEmbedding",
+                modelId: options.EmbeddingGeneratorModel
+            );
+
+            kernelBuilder.AddAzureOpenAIChatCompletion(
+                deploymentName: options.ChatDeployment!,
+                endpoint: options.Endpoint!,
+                apiKey: apiKey!,
+                serviceId: "AzureChat",
+                modelId: options.ChatModel
+            );
+
             var kernel = kernelBuilder.Build();
 
             // plugin criado via DI (não use AddFromType aqui)
-            var productService = sp.GetRequiredService<IProductKf>();
-            kernel.ImportPluginFromObject(productService, "Product");
-
-            var textprocessorService = sp.GetRequiredService<ITextProcessorKf>();
-            kernel.ImportPluginFromObject(textprocessorService, "TextProcessor");
+            kernel.ImportPluginFromObject(sp.GetRequiredService<IProductKf>(), "Product");
+            kernel.ImportPluginFromObject(sp.GetRequiredService<ITextProcessorKf>(), "TextProcessor");
 
             return kernel;
         });

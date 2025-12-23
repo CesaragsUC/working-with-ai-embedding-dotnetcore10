@@ -8,10 +8,7 @@
       "launchUrl": "swagger",
       "applicationUrl": "http://localhost:5085",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "AI_MODEL_PHI3": "phi3:3.8b",
-        "AI_MODEL_GPT4": "gpt-4o-mini",
-        "OPENAI_API_KEY": "YOUR-API-KEY"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
     "stage": {
@@ -21,10 +18,7 @@
       "launchUrl": "swagger",
       "applicationUrl": "https://localhost:7046;http://localhost:5085",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Stage",
-        "AI_MODEL_PHI3": "phi3:3.8b",
-        "AI_MODEL_GPT4": "gpt-4o-mini",
-        "OPENAI_API_KEY": "YOUR-KEY"
+        "ASPNETCORE_ENVIRONMENT": "Stage"
       }
     },
     "prod": {
@@ -34,10 +28,7 @@
       "launchUrl": "swagger",
       "applicationUrl": "https://localhost:7046;http://localhost:5085",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Production",
-        "AI_MODEL_PHI3": "phi3:3.8b",
-        "AI_MODEL_GPT4": "gpt-4o-mini",
-        "OPENAI_API_KEY": "YOUR-KEY"
+        "ASPNETCORE_ENVIRONMENT": "Production"
       }
     }
   }

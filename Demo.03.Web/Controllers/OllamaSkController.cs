@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.Ollama;
 using System.Diagnostics;
 
 namespace Demo.Embedding.Web.Controllers;
@@ -25,21 +27,35 @@ public class OllamaSkController : Controller
     }
 
 
+    [HttpGet()]
+    [Route("chat")]
+    public async Task<IActionResult> ChatWithSk(string prompt)
+    {
+        var chat = _kernel.GetRequiredService<IChatCompletionService>();
+
+        ChatHistory history = new();
+        history.AddUserMessage(prompt);
+
+        var response = await chat.GetChatMessageContentAsync(history);
+
+        return Ok(response.Content);
+    }
+
     [HttpPost]
-    [Route("chat-kernelfunction-auto")]
-    public async Task<IActionResult> AutoInvocation([FromQuery] string prompt)
+    [Route("product-functions")]
+    public async Task<IActionResult> ProductFunction([FromQuery] string prompt)
     {
         if (string.IsNullOrEmpty(prompt))
         {
             return BadRequest(new { error = "Prompt is null or empty" });
         }
 
-        // 2. Configurar para AI decidir quando usar as funções
-        var settings = new PromptExecutionSettings
+        OllamaPromptExecutionSettings prompSettings = new()
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto() 
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
         };
-        var result = await _kernel.InvokePromptAsync(prompt, new KernelArguments(settings));
+
+        var result = await _kernel.InvokePromptAsync(prompt, new KernelArguments(prompSettings));
 
         return Ok(new { response = result.ToString() });
     }
