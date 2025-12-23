@@ -71,8 +71,8 @@ if (builder.Environment.IsDevelopment())
 }
 else
 {
-   //builder.Services.AddGeminiAIClientConfig(builder.Configuration, builder.Environment);
-    builder.Services.AddAnthropicAIClientConfig(builder.Configuration, builder.Environment);
+    builder.Services.AddGeminiAIClientConfig(builder.Configuration, builder.Environment);
+   // builder.Services.AddAnthropicAIClientConfig(builder.Configuration, builder.Environment);
 
     // ambientes stage/prod usam Redis para cache de histórico de chat caso precise.
     builder.Services.AddStackExchangeRedisCache(options =>

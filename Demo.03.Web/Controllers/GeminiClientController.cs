@@ -55,20 +55,34 @@ public class GeminiClientController : Controller
             IncludeRaiReason = true,
             OutputMimeType = "image/jpeg",
         };
+
         var response = await _geminiClient.Models.GenerateImagesAsync(
-          model: "imagen-3.0-generate-002",
-          prompt: "Red skateboard",
+          model: "imagen-4.0-generate-001",
+          prompt: prompt,
           config: generateImagesConfig
         );
 
         // Do something with the generated image
         var image = response.GeneratedImages.First().Image;
 
-        var fileName = $"image{Guid.NewGuid()}.jpg";
+      //  var fileName = $"image{Guid.NewGuid()}.jpg";
 
-        var savedPath = FileDownloadHelper.SaveToDownloads(fileName, image.ImageBytes);
+       // var savedPath = FileDownloadHelper.SaveToDownloads(fileName, image.ImageBytes);
 
-        return Ok($"Arquivo salvo em: {savedPath}");
+        var downloadsPath = Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
+            "Downloads"
+        );
+
+        var outputPath = Path.Combine(downloadsPath, $"image_generated_{Guid.NewGuid()}.png");
+
+       // var image = response.GeneratedImages.First().Image;
+        var imageBytes = image.ImageBytes.ToArray();
+
+        // Salvar bytes no arquivo
+        await System.IO.File.WriteAllBytesAsync(outputPath, imageBytes);
+
+        return Ok(new { Message = "Imagem gerada com sucesso!", ImagePath = outputPath });
     }
 
     [HttpPost]
@@ -101,24 +115,44 @@ public class GeminiClientController : Controller
             }
         }
         // Do something with the generated video
-        var video = operation.Response.GeneratedVideos.First().Video;
+        var downloadsPath = Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
+            "Downloads"
+        );
+
+        var outputPath = Path.Combine(downloadsPath, $"video_generated_{Guid.NewGuid()}.mp4");
 
         await _geminiClient.Files.DownloadToFileAsync(
             generatedVideo: operation.Response.GeneratedVideos.First(),
-            outputPath: $"video-{Guid.NewGuid()}.mp4"
+            outputPath: outputPath
         );
 
-        return Ok($"Arquivo salvo");
+        return Ok(new { Message = "Video gerado com sucesso!", VideoPath = outputPath });
     }
 
     [HttpPost]
     [Route("generate-video-from-image")]
     public async Task<IActionResult> GenerateVideoFromImage([FromForm] DescribeImageRequest request)
     {
+
+        // 2. Create a temporary file path with the correct extension
+        // The SDK needs a real path, and sometimes checks the extension (e.g. .png, .jpg)
+        var tempFile = Path.GetTempFileName();
+        var tempPathWithExtension = Path.ChangeExtension(tempFile, Path.GetExtension(request.File.FileName));
+
+        // Rename the 0-byte temp file to include the extension
+        System.IO.File.Move(tempFile, tempPathWithExtension);
+
+        // 3. Save the uploaded file (RAM) to the temporary path (Disk)
+        using (var stream = new FileStream(tempPathWithExtension, FileMode.Create))
+        {
+            await request.File.CopyToAsync(stream);
+        }
+
         var source = new GenerateVideosSource
         {
             Prompt = request.Prompt,
-            Image = Image.FromFile(request.File.ContentType),
+            Image = Image.FromFile(tempPathWithExtension),
         };
 
         var config = new GenerateVideosConfig
@@ -144,14 +178,19 @@ public class GeminiClientController : Controller
         }
 
         // Do something with the generated video
-        var video = operation.Response.GeneratedVideos.First().Video;
+        var downloadsPath = Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
+            "Downloads"
+        );
+
+        var outputPath = Path.Combine(downloadsPath, $"video_generated_{Guid.NewGuid()}.mp4");
 
         await _geminiClient.Files.DownloadToFileAsync(
             generatedVideo: operation.Response.GeneratedVideos.First(),
-            outputPath: $"video-{Guid.NewGuid()}.mp4"
+            outputPath: outputPath
         );
 
-        return Ok($"Arquivo salvo");
+        return Ok(new { Message = "Video gerado com sucesso!", VideoPath = outputPath });
     }
 
 
