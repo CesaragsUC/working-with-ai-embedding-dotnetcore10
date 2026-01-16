@@ -24,6 +24,12 @@ public interface IPdfPageRenderer
     /// <param name="ct"></param>
     /// <returns></returns>
     Task<byte[]> SkiaSharpPdfRenderPagesAsPngAsync(byte[] pdfBytes, int maxPages, CancellationToken ct);
+
+    Task<List<byte[]>> RenderPagesAsPngListAsync(
+    byte[] pdfBytes,
+    int startPage,
+    int maxPages,
+    CancellationToken ct);
 }
 
 public class PdfPageRenderer : IPdfPageRenderer
@@ -52,7 +58,8 @@ public class PdfPageRenderer : IPdfPageRenderer
                 {
                     var pngBytes = bitmap.Encode(
                         SKEncodedImageFormat.Png,
-                        100).ToArray();
+                        80
+                        ).ToArray();
                     images.Add(pngBytes);
                 }
                 count++;
@@ -83,4 +90,50 @@ public class PdfPageRenderer : IPdfPageRenderer
             return pngBytes;
         }, ct);
     }
+
+    public async Task<List<byte[]>> RenderPagesAsPngListAsync(
+    byte[] pdfBytes,
+    int startPage,
+    int maxPages,
+    CancellationToken ct)
+    {
+        return await Task.Run(() =>
+        {
+            var images = new List<byte[]>();
+            using var pdfStream = new MemoryStream(pdfBytes);
+
+            // Pode ser lazy/enumerable, mas vamos tratar como sequência
+            var bitmaps = Conversion.ToImages(pdfStream);
+
+            int index = 0;
+            foreach (var bitmap in bitmaps)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (index < startPage)
+                {
+                    bitmap.Dispose();
+                    index++;
+                    continue;
+                }
+
+                if (images.Count >= maxPages)
+                {
+                    bitmap.Dispose();
+                    break;
+                }
+
+                using (bitmap)
+                {
+                    var bytes = bitmap.Encode(SKEncodedImageFormat.Png, 100).ToArray();
+                    images.Add(bytes);
+                }
+
+                index++;
+            }
+
+            return images;
+        }, ct);
+    }
+
 }

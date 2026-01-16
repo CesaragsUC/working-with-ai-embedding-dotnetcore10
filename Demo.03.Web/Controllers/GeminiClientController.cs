@@ -1,12 +1,7 @@
-﻿using Azure;
-using Demo.Embedding.Web.Utils;
-using Google.GenAI;
+﻿using Google.GenAI;
 using Google.GenAI.Types;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
 using Serilog;

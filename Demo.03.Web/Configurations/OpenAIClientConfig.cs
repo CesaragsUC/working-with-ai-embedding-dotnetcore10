@@ -28,7 +28,7 @@ public static class OpenAIClientConfig
 
         services
         .AddOptions<OpenAIOptions>()
-        .Bind(configuration.GetSection(OpenAIOptions.SectionName))
+        .BindConfiguration(OpenAIOptions.SectionName)
         .ValidateDataAnnotations()
         .ValidateOnStart();
 
@@ -36,21 +36,19 @@ public static class OpenAIClientConfig
         // Em producao salvar em Azure Key Vault ou similar.
         var apiKey = configuration["OPENAI_API_KEY"];
 
+        services.AddSingleton<OpenAIClient>(_ => new OpenAIClient(apiKey));
+
         services.AddSingleton<ChatClient>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<OpenAIOptions>>().Value;
-            return new ChatClient(options.ChatModel, apiKey);
+            var client = sp.GetRequiredService<OpenAIClient>();
+            return client.GetChatClient(options.ChatModel!);
         });
 
         services.AddSingleton<EmbeddingClient>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<OpenAIOptions>>().Value;
             return new EmbeddingClient(options.EmbeddingGeneratorModel, apiKey);
-        });
-
-        services.AddSingleton<OpenAIClient>(sp =>
-        {
-            return new OpenAIClient(apiKey);
         });
 
 
